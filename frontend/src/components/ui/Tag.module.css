@@ -1,0 +1,42 @@
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25em 0.75em;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  border-radius: 2px;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+  user-select: none;
+}
+
+/* default variant – unselected */
+.default {
+  border: 1px solid var(--gold-dim);
+  color: var(--ink-muted);
+  background: transparent;
+}
+
+.default.selected {
+  background: var(--gold);
+  color: var(--bg-void);
+  border-color: var(--gold);
+  box-shadow: 0 0 12px 0 var(--gold-glow);
+}
+
+/* crimson variant – unselected */
+.crimson {
+  border: 1px solid var(--gold-dim);
+  color: var(--ink-muted);
+  background: transparent;
+}
+
+.crimson.selected {
+  background: var(--crimson);
+  color: var(--ink);
+  border-color: var(--crimson);
+}

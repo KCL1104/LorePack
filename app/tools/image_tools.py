@@ -8,6 +8,8 @@ from datetime import UTC, datetime
 
 from google.genai import types
 
+from app.tools.user_context import resolve_owner_uid
+
 _cached_genai = None
 _cached_col = None
 _IMAGE_MODEL = "imagen-4.0-fast-generate-001"
@@ -68,6 +70,8 @@ def generate_character_image(
     appearance_description: str,
     art_style: str = "anime illustration",
     pose: str = "portrait",
+    lorebook_id: str = "",
+    owner_uid: str = "",
 ) -> str:
     """Generate character art based on an appearance description.
 
@@ -81,6 +85,8 @@ def generate_character_image(
         JSON string containing generation result metadata including gs_uri and prompt_used.
     """
     from app.tools.gcs_tools import upload_image
+
+    resolved_owner_uid = resolve_owner_uid(owner_uid)
 
     prompt = f"{art_style}, {pose} of {character_name}: {appearance_description}"
     safe_name = character_name.lower().replace(" ", "_")
@@ -103,6 +109,8 @@ def generate_character_image(
         "asset_type": "character",
         "prompt_used": prompt,
         "gs_uri": gs_uri,
+        "lorebook_id": lorebook_id,
+        "owner_uid": resolved_owner_uid,
         "art_style": art_style,
         "pose": pose,
         "generated_at": now,
@@ -117,6 +125,8 @@ def generate_scene_image(
     scene_description: str,
     art_style: str = "concept art",
     mood: str = "neutral",
+    lorebook_id: str = "",
+    owner_uid: str = "",
 ) -> str:
     """Generate a scene concept image based on a scene description.
 
@@ -130,6 +140,8 @@ def generate_scene_image(
         JSON string containing generation result metadata including gs_uri and prompt_used.
     """
     from app.tools.gcs_tools import upload_image
+
+    resolved_owner_uid = resolve_owner_uid(owner_uid)
 
     prompt = f"{art_style}, {mood} mood: {scene_description}"
     safe_name = scene_name.lower().replace(" ", "_")
@@ -152,6 +164,8 @@ def generate_scene_image(
         "asset_type": "scene",
         "prompt_used": prompt,
         "gs_uri": gs_uri,
+        "lorebook_id": lorebook_id,
+        "owner_uid": resolved_owner_uid,
         "art_style": art_style,
         "mood": mood,
         "generated_at": now,
@@ -161,7 +175,7 @@ def generate_scene_image(
     return json.dumps(metadata, ensure_ascii=False, indent=2)
 
 
-def get_character_visual_history(character_name: str) -> str:
+def get_character_visual_history(character_name: str, owner_uid: str = "") -> str:
     """Query past image generations for a character to maintain visual consistency.
 
     Args:
@@ -170,7 +184,9 @@ def get_character_visual_history(character_name: str) -> str:
     Returns:
         JSON string containing a list of past generations with prompts and URIs.
     """
+    resolved_owner_uid = resolve_owner_uid(owner_uid)
     query = _get_image_assets_col().where("character_name", "==", character_name)
+    query = query.where("owner_uid", "==", resolved_owner_uid)
     history = []
     for doc in query.stream():
         d = doc.to_dict()

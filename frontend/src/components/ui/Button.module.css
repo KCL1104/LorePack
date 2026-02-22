@@ -1,0 +1,46 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  padding: 0.5em 1.4em;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  background: transparent;
+  transition: all var(--transition-fast);
+  line-height: 1.4;
+}
+
+.button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.primary {
+  border: 1px solid var(--gold);
+  border-radius: 2px;
+  color: var(--gold);
+}
+
+.primary:hover {
+  background: var(--gold);
+  color: var(--bg-void);
+  box-shadow: 0 0 15px 0 var(--gold-glow);
+}
+
+.ghost {
+  border: none;
+  border-radius: 0;
+  color: var(--gold-dim);
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.ghost:hover {
+  color: var(--gold);
+  text-decoration: underline;
+}

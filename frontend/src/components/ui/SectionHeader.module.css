@@ -1,0 +1,24 @@
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.title {
+  font-family: var(--font-heading);
+  color: var(--gold);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.wrapper {
+  width: 100%;
+}
+
+.divider {
+  padding: 0.35rem 0;
+}

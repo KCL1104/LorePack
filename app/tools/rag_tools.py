@@ -5,6 +5,8 @@
 import json
 import math
 
+from app.tools.user_context import resolve_owner_uid
+
 _EMBED_MODEL = "text-embedding-004"
 _cached_genai_client = None
 _cached_lorebooks_col = None
@@ -57,7 +59,7 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
     return dot / (norm_a * norm_b)
 
 
-def embed_and_store_entry(lorebook_id: str, entry_id: str) -> None:
+def embed_and_store_entry(lorebook_id: str, entry_id: str, owner_uid: str = "") -> None:
     """Compute and store embedding for a lorebook entry.
 
     Called automatically when entries are created or updated.
@@ -66,7 +68,16 @@ def embed_and_store_entry(lorebook_id: str, entry_id: str) -> None:
         lorebook_id: Lorebook ID.
         entry_id: Entry ID within the lorebook.
     """
+    resolved_owner_uid = resolve_owner_uid(owner_uid)
     _lorebooks_col = _get_lorebooks_col()
+    lb_ref = _lorebooks_col.document(lorebook_id)
+    lb_snap = lb_ref.get()
+    if not lb_snap.exists:
+        return
+
+    if lb_snap.to_dict().get("owner_uid") != resolved_owner_uid:
+        return
+
     entry_ref = (
         _lorebooks_col.document(lorebook_id).collection("entries").document(entry_id)
     )
@@ -75,13 +86,21 @@ def embed_and_store_entry(lorebook_id: str, entry_id: str) -> None:
         return
 
     entry = entry_snap.to_dict()
+    if entry.get("owner_uid") != resolved_owner_uid:
+        return
+
     tags = entry.get("tags", [])
     text = f"{entry['name']}. Category: {entry['category']}. {entry['content']}. Tags: {', '.join(tags)}"
     embedding = _compute_embedding(text)
     entry_ref.update({"embedding": embedding})
 
 
-def search_lore(query: str, lorebook_id: str = "", top_k: int = 5) -> str:
+def search_lore(
+    query: str,
+    lorebook_id: str = "",
+    top_k: int = 5,
+    owner_uid: str = "",
+) -> str:
     """Perform a semantic search across lorebooks for the most relevant entries.
 
     This tool is the core of RAG (Retrieval-Augmented Generation), used to
@@ -99,6 +118,7 @@ def search_lore(query: str, lorebook_id: str = "", top_k: int = 5) -> str:
     Returns:
         JSON string containing a list of the most relevant lorebook entries.
     """
+    resolved_owner_uid = resolve_owner_uid(owner_uid)
     _lorebooks_col = _get_lorebooks_col()
     query_embedding = _compute_embedding(query)
     results = []
@@ -108,14 +128,25 @@ def search_lore(query: str, lorebook_id: str = "", top_k: int = 5) -> str:
         lb_snap = _lorebooks_col.document(lorebook_id).get()
         if not lb_snap.exists:
             return json.dumps([], ensure_ascii=False, indent=2)
-        scope = [(lorebook_id, lb_snap.to_dict())]
+
+        lorebook_data = lb_snap.to_dict()
+        if lorebook_data.get("owner_uid") != resolved_owner_uid:
+            return json.dumps([], ensure_ascii=False, indent=2)
+        scope = [(lorebook_id, lorebook_data)]
     else:
-        scope = [(s.id, s.to_dict()) for s in _lorebooks_col.stream()]
+        scope = [
+            (s.id, s.to_dict())
+            for s in _lorebooks_col.stream()
+            if s.to_dict().get("owner_uid") == resolved_owner_uid
+        ]
 
     for lb_id, lorebook in scope:
         entries_ref = _lorebooks_col.document(lb_id).collection("entries")
         for entry_snap in entries_ref.stream():
             entry = entry_snap.to_dict()
+            if entry.get("owner_uid") != resolved_owner_uid:
+                continue
+
             entry_embedding = entry.get("embedding")
 
             if entry_embedding:

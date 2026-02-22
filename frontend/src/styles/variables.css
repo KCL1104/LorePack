@@ -1,0 +1,45 @@
+:root {
+  /* Surfaces */
+  --bg-void: #0a0a0f;
+  --bg-primary: #12121a;
+  --bg-elevated: #1a1a26;
+  --bg-surface: #222233;
+
+  /* Metallic Accents */
+  --gold-dim: #8b7355;
+  --gold: #c4a265;
+  --gold-bright: #e8d5a3;
+  --gold-glow: #c4a26540;
+
+  /* Semantic */
+  --ink: #d4cfc4;
+  --ink-muted: #8a8578;
+  --crimson: #8b2d3a;
+  --emerald: #2d5a3d;
+  --arcane-blue: #3d4f7a;
+
+  /* Typography */
+  --font-display: 'Cinzel Decorative', serif;
+  --font-heading: 'Cinzel', serif;
+  --font-body: 'Cormorant Garamond', serif;
+  --font-ui: 'Jost', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
+
+  /* Sidebar */
+  --sidebar-width-collapsed: 64px;
+  --sidebar-width-expanded: 220px;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+  --transition-slow: 400ms ease;
+}

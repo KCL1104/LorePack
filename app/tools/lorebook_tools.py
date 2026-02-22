@@ -6,6 +6,8 @@ import json
 import uuid
 from datetime import UTC, datetime
 
+from app.tools.user_context import resolve_owner_uid
+
 _cached_col = None
 
 
@@ -19,7 +21,12 @@ def _get_lorebooks_col():
     return _cached_col
 
 
-def create_lorebook(title: str, genre: str, description: str) -> str:
+def create_lorebook(
+    title: str,
+    genre: str,
+    description: str,
+    owner_uid: str = "",
+) -> str:
     """Create a new lorebook.
 
     Args:
@@ -31,12 +38,14 @@ def create_lorebook(title: str, genre: str, description: str) -> str:
         JSON string containing the new lorebook's ID and details.
     """
     lorebook_id = str(uuid.uuid4())[:8]
+    resolved_owner_uid = resolve_owner_uid(owner_uid)
     now = datetime.now(UTC).isoformat()
     lorebook = {
         "id": lorebook_id,
         "title": title,
         "genre": genre,
         "description": description,
+        "owner_uid": resolved_owner_uid,
         "created_at": now,
         "updated_at": now,
     }
@@ -52,6 +61,7 @@ def add_lorebook_entry(
     content: str,
     tags: str = "",
     visibility: str = "private",
+    owner_uid: str = "",
 ) -> str:
     """Add a new entry to the specified lorebook.
 
@@ -67,8 +77,16 @@ def add_lorebook_entry(
     Returns:
         JSON string containing the new entry's full details, or an error message.
     """
+    resolved_owner_uid = resolve_owner_uid(owner_uid)
     lb_ref = _get_lorebooks_col().document(lorebook_id)
-    if not lb_ref.get().exists:
+    lb_snap = lb_ref.get()
+    if not lb_snap.exists:
+        return json.dumps(
+            {"error": f"Lorebook {lorebook_id} not found"}, ensure_ascii=False
+        )
+
+    lorebook = lb_snap.to_dict()
+    if lorebook.get("owner_uid") != resolved_owner_uid:
         return json.dumps(
             {"error": f"Lorebook {lorebook_id} not found"}, ensure_ascii=False
         )
@@ -82,6 +100,7 @@ def add_lorebook_entry(
         "content": content,
         "tags": [t.strip() for t in tags.split(",") if t.strip()],
         "visibility": visibility,
+        "owner_uid": resolved_owner_uid,
         "created_at": now,
     }
     lb_ref.collection("entries").document(entry_id).set(entry)
@@ -90,12 +109,15 @@ def add_lorebook_entry(
     # Compute and store embedding for semantic search
     from app.tools.rag_tools import embed_and_store_entry
 
-    embed_and_store_entry(lorebook_id, entry_id)
+    try:
+        embed_and_store_entry(lorebook_id, entry_id, owner_uid=resolved_owner_uid)
+    except TypeError:
+        embed_and_store_entry(lorebook_id, entry_id)
 
     return json.dumps(entry, ensure_ascii=False, indent=2)
 
 
-def get_lorebook(lorebook_id: str) -> str:
+def get_lorebook(lorebook_id: str, owner_uid: str = "") -> str:
     """Retrieve the full contents of the specified lorebook.
 
     Args:
@@ -104,6 +126,7 @@ def get_lorebook(lorebook_id: str) -> str:
     Returns:
         JSON string containing the lorebook's full details, or an error message.
     """
+    resolved_owner_uid = resolve_owner_uid(owner_uid)
     col = _get_lorebooks_col()
     lb_snap = col.document(lorebook_id).get()
     if not lb_snap.exists:
@@ -112,23 +135,37 @@ def get_lorebook(lorebook_id: str) -> str:
         )
 
     lorebook = lb_snap.to_dict()
+    if lorebook.get("owner_uid") != resolved_owner_uid:
+        return json.dumps(
+            {"error": f"Lorebook {lorebook_id} not found"}, ensure_ascii=False
+        )
+
     entries_ref = col.document(lorebook_id).collection("entries")
-    lorebook["entries"] = [e.to_dict() for e in entries_ref.stream()]
+    lorebook["entries"] = [
+        e.to_dict()
+        for e in entries_ref.stream()
+        if e.to_dict().get("owner_uid") == resolved_owner_uid
+    ]
     return json.dumps(lorebook, ensure_ascii=False, indent=2)
 
 
-def list_lorebooks() -> str:
+def list_lorebooks(owner_uid: str = "") -> str:
     """List summary information for all lorebooks.
 
     Returns:
         JSON string containing the ID, title, genre, and entry count for all lorebooks.
     """
+    resolved_owner_uid = resolve_owner_uid(owner_uid)
     col = _get_lorebooks_col()
     summaries = []
     for lb_snap in col.stream():
         lb = lb_snap.to_dict()
+        if lb.get("owner_uid") != resolved_owner_uid:
+            continue
         entry_count = sum(
-            1 for _ in col.document(lb["id"]).collection("entries").stream()
+            1
+            for entry in col.document(lb["id"]).collection("entries").stream()
+            if entry.to_dict().get("owner_uid") == resolved_owner_uid
         )
         summaries.append(
             {
@@ -142,7 +179,7 @@ def list_lorebooks() -> str:
     return json.dumps(summaries, ensure_ascii=False, indent=2)
 
 
-def validate_lorebook_consistency(lorebook_id: str) -> str:
+def validate_lorebook_consistency(lorebook_id: str, owner_uid: str = "") -> str:
     """Validate the internal logical consistency of a lorebook.
 
     Checks include: whether character relationships are symmetric, whether
@@ -154,6 +191,7 @@ def validate_lorebook_consistency(lorebook_id: str) -> str:
     Returns:
         JSON string containing the validation results and a list of potential issues.
     """
+    resolved_owner_uid = resolve_owner_uid(owner_uid)
     col = _get_lorebooks_col()
     lb_snap = col.document(lorebook_id).get()
     if not lb_snap.exists:
@@ -161,8 +199,18 @@ def validate_lorebook_consistency(lorebook_id: str) -> str:
             {"error": f"Lorebook {lorebook_id} not found"}, ensure_ascii=False
         )
 
+    lorebook = lb_snap.to_dict()
+    if lorebook.get("owner_uid") != resolved_owner_uid:
+        return json.dumps(
+            {"error": f"Lorebook {lorebook_id} not found"}, ensure_ascii=False
+        )
+
     entries_ref = col.document(lorebook_id).collection("entries")
-    entries = [e.to_dict() for e in entries_ref.stream()]
+    entries = [
+        e.to_dict()
+        for e in entries_ref.stream()
+        if e.to_dict().get("owner_uid") == resolved_owner_uid
+    ]
     issues: list[str] = []
 
     # Basic validation: check for entries without tags

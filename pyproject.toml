@@ -16,6 +16,10 @@ dependencies = [
     "protobuf>=6.31.1,<7.0.0",
     "google-cloud-firestore>=2.23.0",
     "google-genai>=1.63.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "sse-starlette>=2.2.0",
+    "firebase-admin>=7.1.0",
 ]
 requires-python = ">=3.13,<3.14"
 

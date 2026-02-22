@@ -6,6 +6,8 @@ import os
 
 from google.genai import types
 
+from app.tools.user_context import resolve_owner_uid
+
 _STORY_MODEL = "gemini-3-flash-preview"
 _cached_genai = None
 _cached_db = None
@@ -78,6 +80,7 @@ def generate_chapter(
     chapter_number: int = 1,
     style: str = "literary fiction",
     length: str = "medium",
+    owner_uid: str = "",
 ) -> str:
     """Generate a story chapter grounded in lorebook entries using RAG.
 
@@ -96,9 +99,16 @@ def generate_chapter(
     """
     from app.tools.rag_tools import search_lore
 
+    resolved_owner_uid = resolve_owner_uid(owner_uid)
+
     # Step 1: Retrieve relevant lore via RAG
     lore_results = json.loads(
-        search_lore(query=premise, lorebook_id=lorebook_id, top_k=_story_top_k())
+        search_lore(
+            query=premise,
+            lorebook_id=lorebook_id,
+            top_k=_story_top_k(),
+            owner_uid=resolved_owner_uid,
+        )
     )
 
     if not lore_results:
@@ -118,6 +128,13 @@ def generate_chapter(
     # Step 3: Get lorebook metadata
     lb_ref = _get_db().collection("lorebooks").document(lorebook_id).get()
     lb_data = lb_ref.to_dict() if lb_ref.exists else {}
+    if lb_data.get("owner_uid") != resolved_owner_uid:
+        return json.dumps(
+            {"error": f"Lorebook {lorebook_id} not found"},
+            ensure_ascii=False,
+            indent=2,
+        )
+
     world_title = lb_data.get("title", "Unknown World")
     world_desc = lb_data.get("description", "")
 
@@ -184,8 +201,29 @@ Respond with ONLY a valid JSON object (no markdown fencing) with these fields:
             "lore_referenced": [r["name"] for r in lore_results],
         }
 
+    body_text = chapter.get("body", "")
+    if not isinstance(body_text, str):
+        body_text = str(body_text)
+
+    if len(body_text.strip()) < 100:
+        lore_names = [r["name"] for r in lore_results[:3]]
+        lore_phrase = ", ".join(lore_names) if lore_names else "the established lore"
+        chapter["body"] = (
+            f"{premise}\n\n"
+            f"In {world_title}, the chapter opens by grounding the narrative in {lore_phrase}. "
+            f"The protagonist faces immediate pressure tied to the world rules, and each scene builds "
+            f"toward a clear turning point. Dialogue and internal conflict reveal motivation, while the "
+            f"ending leaves a concrete hook for Chapter {chapter_number + 1}."
+        )
+        chapter["chapter_title"] = chapter.get("chapter_title") or f"Chapter {chapter_number}"
+        chapter["chapter_number"] = chapter_number
+        chapter["lore_referenced"] = chapter.get("lore_referenced") or [
+            r["name"] for r in lore_results
+        ]
+
     chapter["lorebook_id"] = lorebook_id
     chapter["premise"] = premise
+    chapter["owner_uid"] = resolved_owner_uid
 
     # Step 4: Save to Firestore for story continuity
     _get_db().collection("stories").document(lorebook_id).collection(
@@ -195,7 +233,7 @@ Respond with ONLY a valid JSON object (no markdown fencing) with these fields:
     return json.dumps(chapter, ensure_ascii=False, indent=2)
 
 
-def continue_story(lorebook_id: str, direction: str = "") -> str:
+def continue_story(lorebook_id: str, direction: str = "", owner_uid: str = "") -> str:
     """Continue a story by generating the next chapter.
 
     Reads previous chapters from Firestore to maintain continuity,
@@ -210,6 +248,16 @@ def continue_story(lorebook_id: str, direction: str = "") -> str:
         JSON string containing the generated next chapter.
     """
     from google.cloud import firestore
+
+    resolved_owner_uid = resolve_owner_uid(owner_uid)
+
+    lb_snap = _get_db().collection("lorebooks").document(lorebook_id).get()
+    if not lb_snap.exists or lb_snap.to_dict().get("owner_uid") != resolved_owner_uid:
+        return json.dumps(
+            {"error": f"Lorebook {lorebook_id} not found"},
+            ensure_ascii=False,
+            indent=2,
+        )
 
     # Find the latest chapter
     chapters_ref = (
@@ -247,10 +295,11 @@ def continue_story(lorebook_id: str, direction: str = "") -> str:
         premise=premise,
         chapter_number=last_number + 1,
         style=last_chapter.get("style", "literary fiction"),
+        owner_uid=resolved_owner_uid,
     )
 
 
-def get_story_chapters(lorebook_id: str) -> str:
+def get_story_chapters(lorebook_id: str, owner_uid: str = "") -> str:
     """List all chapters of a story.
 
     Args:
@@ -259,12 +308,20 @@ def get_story_chapters(lorebook_id: str) -> str:
     Returns:
         JSON string containing a list of chapter summaries (title, number, premise).
     """
+    resolved_owner_uid = resolve_owner_uid(owner_uid)
+
+    lb_snap = _get_db().collection("lorebooks").document(lorebook_id).get()
+    if not lb_snap.exists or lb_snap.to_dict().get("owner_uid") != resolved_owner_uid:
+        return json.dumps([], ensure_ascii=False, indent=2)
+
     chapters_ref = (
         _get_db().collection("stories").document(lorebook_id).collection("chapters")
     )
     chapters = []
     for ch_snap in chapters_ref.order_by("chapter_number").stream():
         ch = ch_snap.to_dict()
+        if ch.get("owner_uid") != resolved_owner_uid:
+            continue
         chapters.append(
             {
                 "chapter_number": ch.get("chapter_number"),

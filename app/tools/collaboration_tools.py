@@ -6,6 +6,8 @@ import json
 import uuid
 from datetime import UTC, datetime
 
+from app.tools.user_context import current_user_uid, resolve_owner_uid
+
 _cached_col = None
 
 
@@ -19,7 +21,13 @@ def _get_lorebooks_col():
     return _cached_col
 
 
-def export_lorebook(lorebook_id: str) -> str:
+def _resolve_requester_uid(requester_uid: str = "") -> str:
+    if requester_uid.strip():
+        return requester_uid.strip()
+    return current_user_uid() or ""
+
+
+def export_lorebook(lorebook_id: str, requester_uid: str = "") -> str:
     """Export a lorebook's public entries as a shareable JSON package.
 
     Reads the lorebook and its entries from Firestore, filters to only
@@ -41,6 +49,9 @@ def export_lorebook(lorebook_id: str) -> str:
         )
 
     lorebook = lb_snap.to_dict()
+    resolved_requester_uid = _resolve_requester_uid(requester_uid)
+    source_owner_uid = lorebook.get("owner_uid", "")
+
     entries_ref = _get_lorebooks_col().document(lorebook_id).collection("entries")
     public_entries = []
     for entry_snap in entries_ref.stream():
@@ -49,18 +60,25 @@ def export_lorebook(lorebook_id: str) -> str:
             entry.pop("embedding", None)
             public_entries.append(entry)
 
+    if resolved_requester_uid and source_owner_uid != resolved_requester_uid and not public_entries:
+        return json.dumps(
+            {"error": f"Lorebook {lorebook_id} has no public entries"},
+            ensure_ascii=False,
+        )
+
     package = {
         "id": lorebook["id"],
         "title": lorebook["title"],
         "genre": lorebook.get("genre", ""),
         "description": lorebook.get("description", ""),
+        "source_owner_uid": source_owner_uid,
         "exported_at": datetime.now(UTC).isoformat(),
         "entries": public_entries,
     }
     return json.dumps(package, ensure_ascii=False, indent=2)
 
 
-def import_lorebook(lorebook_data: str) -> str:
+def import_lorebook(lorebook_data: str, owner_uid: str = "") -> str:
     """Import a lorebook from a JSON package (as produced by export_lorebook).
 
     Creates a new lorebook in Firestore with a new ID and a title prefixed
@@ -76,6 +94,7 @@ def import_lorebook(lorebook_data: str) -> str:
     from app.tools.rag_tools import embed_and_store_entry
 
     data = json.loads(lorebook_data)
+    resolved_owner_uid = resolve_owner_uid(owner_uid)
     new_id = str(uuid.uuid4())[:8]
     now = datetime.now(UTC).isoformat()
 
@@ -84,6 +103,7 @@ def import_lorebook(lorebook_data: str) -> str:
         "title": f"[Imported] {data['title']}",
         "genre": data.get("genre", ""),
         "description": data.get("description", ""),
+        "owner_uid": resolved_owner_uid,
         "created_at": now,
         "updated_at": now,
     }
@@ -100,12 +120,16 @@ def import_lorebook(lorebook_data: str) -> str:
             "content": entry["content"],
             "tags": entry.get("tags", []),
             "visibility": entry.get("visibility", "private"),
+            "owner_uid": resolved_owner_uid,
             "created_at": now,
         }
         _get_lorebooks_col().document(new_id).collection("entries").document(
             entry_id
         ).set(new_entry)
-        embed_and_store_entry(new_id, entry_id)
+        try:
+            embed_and_store_entry(new_id, entry_id, owner_uid=resolved_owner_uid)
+        except TypeError:
+            embed_and_store_entry(new_id, entry_id)
         imported_count += 1
 
     result = {
@@ -117,7 +141,7 @@ def import_lorebook(lorebook_data: str) -> str:
     return json.dumps(result, ensure_ascii=False, indent=2)
 
 
-def list_public_lorebooks() -> str:
+def list_public_lorebooks(requester_uid: str = "") -> str:
     """List lorebooks that have at least one public entry.
 
     Queries Firestore for all lorebooks, counts how many entries in each
@@ -126,9 +150,16 @@ def list_public_lorebooks() -> str:
     Returns:
         JSON list of objects with id, title, genre, and public_entry_count.
     """
+    resolved_requester_uid = _resolve_requester_uid(requester_uid)
     results = []
     for lb_snap in _get_lorebooks_col().stream():
         lb = lb_snap.to_dict()
+        owner_uid = lb.get("owner_uid")
+        if not owner_uid:
+            continue
+        if resolved_requester_uid and owner_uid == resolved_requester_uid:
+            continue
+
         lb_id = lb["id"]
         entries_ref = _get_lorebooks_col().document(lb_id).collection("entries")
         public_count = sum(
@@ -140,6 +171,7 @@ def list_public_lorebooks() -> str:
                     "id": lb_id,
                     "title": lb["title"],
                     "genre": lb.get("genre", ""),
+                    "description": lb.get("description", ""),
                     "public_entry_count": public_count,
                 }
             )
@@ -150,6 +182,7 @@ def propose_crossover(
     source_lorebook_id: str,
     target_lorebook_id: str,
     character_names: str,
+    requester_uid: str = "",
 ) -> str:
     """Create a crossover proposal to bring characters from one lorebook into another.
 
@@ -180,21 +213,54 @@ def propose_crossover(
             ensure_ascii=False,
         )
 
+    resolved_requester_uid = _resolve_requester_uid(requester_uid)
+    source_owner_uid = source_snap.to_dict().get("owner_uid", "")
+    target_owner_uid = target_snap.to_dict().get("owner_uid", "")
+
+    if (
+        resolved_requester_uid
+        and source_owner_uid != resolved_requester_uid
+        and target_owner_uid != resolved_requester_uid
+    ):
+        return json.dumps(
+            {
+                "error": "Not authorized to create a proposal between these lorebooks"
+            },
+            ensure_ascii=False,
+        )
+
     names = [n.strip() for n in character_names.split(",") if n.strip()]
 
     # Gather source entries
     source_entries_ref = (
         _get_lorebooks_col().document(source_lorebook_id).collection("entries")
     )
-    source_entries = {
-        e.to_dict()["name"]: e.to_dict() for e in source_entries_ref.stream()
-    }
+    source_entries = {}
+    for entry_snap in source_entries_ref.stream():
+        entry = entry_snap.to_dict()
+        if (
+            resolved_requester_uid
+            and source_owner_uid != resolved_requester_uid
+            and entry.get("visibility") != "public"
+        ):
+            continue
+
+        source_entries[entry["name"]] = entry
 
     # Gather target entry names for conflict detection
     target_entries_ref = (
         _get_lorebooks_col().document(target_lorebook_id).collection("entries")
     )
-    target_names = {e.to_dict()["name"] for e in target_entries_ref.stream()}
+    target_names = set()
+    for entry_snap in target_entries_ref.stream():
+        entry = entry_snap.to_dict()
+        if (
+            resolved_requester_uid
+            and target_owner_uid != resolved_requester_uid
+            and entry.get("visibility") != "public"
+        ):
+            continue
+        target_names.add(entry["name"])
 
     characters = []
     not_found = []
@@ -213,6 +279,8 @@ def propose_crossover(
     proposal = {
         "source_lorebook_id": source_lorebook_id,
         "target_lorebook_id": target_lorebook_id,
+        "source_owner_uid": source_owner_uid,
+        "target_owner_uid": target_owner_uid,
         "characters": characters,
         "not_found": not_found,
         "conflicts": conflicts,
@@ -221,7 +289,7 @@ def propose_crossover(
     return json.dumps(proposal, ensure_ascii=False, indent=2)
 
 
-def accept_crossover(proposal_json: str) -> str:
+def accept_crossover(proposal_json: str, requester_uid: str = "") -> str:
     """Accept a crossover proposal and copy character entries into the target lorebook.
 
     Takes a proposal JSON (as produced by propose_crossover), copies each
@@ -236,6 +304,8 @@ def accept_crossover(proposal_json: str) -> str:
     from app.tools.rag_tools import embed_and_store_entry
 
     proposal = json.loads(proposal_json)
+    resolved_requester_uid = _resolve_requester_uid(requester_uid)
+    source_id = proposal.get("source_lorebook_id", "")
     target_id = proposal["target_lorebook_id"]
     now = datetime.now(UTC).isoformat()
 
@@ -245,8 +315,31 @@ def accept_crossover(proposal_json: str) -> str:
             {"error": f"Target lorebook {target_id} not found"}, ensure_ascii=False
         )
 
+    target = target_snap.to_dict()
+    target_owner_uid = target.get("owner_uid", "")
+
+    if resolved_requester_uid and target_owner_uid != resolved_requester_uid:
+        return json.dumps(
+            {"error": "Not authorized to modify target lorebook"},
+            ensure_ascii=False,
+        )
+
+    source_owner_uid = ""
+    if source_id:
+        source_snap = _get_lorebooks_col().document(source_id).get()
+        if source_snap.exists:
+            source_owner_uid = source_snap.to_dict().get("owner_uid", "")
+
     copied = []
     for char in proposal.get("characters", []):
+        if (
+            resolved_requester_uid
+            and source_owner_uid
+            and source_owner_uid != resolved_requester_uid
+            and char.get("visibility") != "public"
+        ):
+            continue
+
         entry_id = str(uuid.uuid4())[:8]
         new_entry = {
             "id": entry_id,
@@ -255,12 +348,16 @@ def accept_crossover(proposal_json: str) -> str:
             "content": char["content"],
             "tags": char.get("tags", []),
             "visibility": char.get("visibility", "private"),
+            "owner_uid": target_owner_uid,
             "created_at": now,
         }
         _get_lorebooks_col().document(target_id).collection("entries").document(
             entry_id
         ).set(new_entry)
-        embed_and_store_entry(target_id, entry_id)
+        try:
+            embed_and_store_entry(target_id, entry_id, owner_uid=target_owner_uid)
+        except TypeError:
+            embed_and_store_entry(target_id, entry_id)
         copied.append({"name": char["name"], "entry_id": entry_id})
 
     _get_lorebooks_col().document(target_id).update({"updated_at": now})

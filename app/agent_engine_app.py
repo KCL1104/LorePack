@@ -18,7 +18,7 @@ from typing import Any
 
 import nest_asyncio
 import vertexai
-from a2a.types import AgentCapabilities, AgentCard, TransportProtocol
+from a2a.types import AgentCapabilities, AgentCard, AgentSkill, TransportProtocol
 from dotenv import load_dotenv
 from google.adk.a2a.executor.a2a_agent_executor import A2aAgentExecutor
 from google.adk.a2a.utils.agent_card_builder import AgentCardBuilder
@@ -92,6 +92,44 @@ class AgentEngineApp(A2aAgent):
         agent_card = await agent_card_builder.build()
         agent_card.preferred_transport = TransportProtocol.http_json  # Http Only.
         agent_card.supports_authenticated_extended_card = True
+
+        # Declare LorePack-specific A2A skills for agent discovery
+        agent_card.skills.extend(
+            [
+                AgentSkill(
+                    id="lorebook_sharing",
+                    name="Lorebook Sharing",
+                    description=(
+                        "Can export and import worldbuilding lorebooks. "
+                        "Public lorebook entries can be shared with other agents "
+                        "via the A2A protocol for cross-user collaboration."
+                    ),
+                    tags=["worldbuilding", "lorebook", "sharing", "export", "import"],
+                    examples=[
+                        "Share my fantasy lorebook with another user",
+                        "Import a lorebook from another agent",
+                        "List all publicly available lorebooks",
+                    ],
+                ),
+                AgentSkill(
+                    id="character_crossover",
+                    name="Character Crossover",
+                    description=(
+                        "Can negotiate character crossover rules between lorebooks. "
+                        "Supports proposing, evaluating, and accepting crossover of "
+                        "characters from one worldbuilding universe into another, "
+                        "with automatic conflict detection."
+                    ),
+                    tags=["crossover", "character", "negotiation", "collaboration"],
+                    examples=[
+                        "Propose a crossover of Aria Stormwind into the sci-fi universe",
+                        "Check if these characters conflict with my existing lore",
+                        "Accept the crossover proposal and merge characters",
+                    ],
+                ),
+            ]
+        )
+
         return agent_card
 
     def set_up(self) -> None:

@@ -1,0 +1,21 @@
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.main {
+  margin-left: var(--sidebar-width-expanded);
+  flex: 1;
+  padding: var(--space-xl) var(--space-xl);
+  min-height: 100vh;
+  background: var(--bg-primary);
+  color: var(--ink);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.main>* {
+  width: 100%;
+  max-width: 1120px;
+}

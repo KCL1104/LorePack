@@ -1,0 +1,14 @@
+.divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.75rem 0;
+}
+
+.divider svg {
+  display: block;
+  width: 100%;
+  height: 12px;
+  color: var(--gold-dim);
+}

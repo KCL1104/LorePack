@@ -1,0 +1,23 @@
+.stack {
+  position: fixed;
+  top: var(--space-md);
+  right: var(--space-md);
+  z-index: 240;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  pointer-events: none;
+}
+
+.stack > * {
+  pointer-events: auto;
+}
+
+@media (max-width: 780px) {
+  .stack {
+    right: var(--space-sm);
+    left: var(--space-sm);
+    top: var(--space-sm);
+    align-items: center;
+  }
+}

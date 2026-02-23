@@ -1,21 +1,56 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router';
 
+import { listPublicLorebooks } from '../../api';
+import { useAppStore } from '../../stores/appStore';
 import { useAuthStore } from '../../stores/authStore';
 import styles from './Sidebar.module.css';
 
-const navItems = [
+interface NavItem {
+  to: string;
+  label: string;
+  badgeKey?: 'crossroads';
+}
+
+const navItems: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/story-studio', label: 'Story Studio' },
   { to: '/lorebook', label: 'Lorebook' },
   { to: '/gallery', label: 'Gallery' },
-  { to: '/crossroads', label: 'Crossroads' },
+  { to: '/crossroads', label: 'Crossroads', badgeKey: 'crossroads' },
 ];
 
 export function Sidebar() {
   const navigate = useNavigate();
   const signOutUser = useAuthStore((state) => state.signOutUser);
   const [signingOut, setSigningOut] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [publicCount, setPublicCount] = useState(0);
+  const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const sidebarDimmed = useAppStore((state) => state.sidebarDimmed);
+
+  useEffect(() => {
+    let cancelled = false;
+    listPublicLorebooks()
+      .then((items) => {
+        if (!cancelled) setPublicCount(items.length);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleMouseEnter = () => {
+    if (collapseTimerRef.current) {
+      clearTimeout(collapseTimerRef.current);
+      collapseTimerRef.current = null;
+    }
+    setExpanded(true);
+  };
+
+  const handleMouseLeave = () => {
+    collapseTimerRef.current = setTimeout(() => setExpanded(false), 120);
+  };
 
   const handleSignOut = async () => {
     if (signingOut) return;
@@ -29,9 +64,20 @@ export function Sidebar() {
     }
   };
 
+  const sidebarClass = [
+    styles.sidebar,
+    expanded ? styles.sidebarExpanded : '',
+    sidebarDimmed ? styles.sidebarDimmed : '',
+  ].filter(Boolean).join(' ');
+
   return (
-    <aside className={styles.sidebar}>
+    <aside
+      className={sidebarClass}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
       <div className={styles.logo}>
+        <span className={styles.logoIcon}>✦</span>
         <span className={styles.logoText}>LOREPACK</span>
       </div>
 
@@ -45,6 +91,9 @@ export function Sidebar() {
             }
           >
             <span className={styles.navLabel}>{item.label}</span>
+            {item.badgeKey === 'crossroads' && publicCount > 0 ? (
+              <span className={styles.badge} aria-label={`${publicCount} public worlds`} />
+            ) : null}
           </NavLink>
         ))}
 

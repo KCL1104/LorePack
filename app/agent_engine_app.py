@@ -127,6 +127,22 @@ class AgentEngineApp(A2aAgent):
                         "Accept the crossover proposal and merge characters",
                     ],
                 ),
+                AgentSkill(
+                    id="story_generation",
+                    name="Illustrated Story Generation",
+                    description=(
+                        "Can conjure a new story world from genre, era, and protagonist parameters, "
+                        "then generate illustrated chapters grounded in lorebook entries via RAG. "
+                        "Uses Gemini interleaved output for inline scene illustrations. "
+                        "Supports configurable chapter length and writing style."
+                    ),
+                    tags=["story", "chapter", "generation", "illustration", "RAG", "narrative"],
+                    examples=[
+                        "Conjure a dark fantasy world with a warrior protagonist",
+                        "Generate Chapter 2 of the ongoing story",
+                        "Continue the story with an epic battle scene",
+                    ],
+                ),
             ]
         )
 
@@ -149,8 +165,9 @@ class AgentEngineApp(A2aAgent):
             logging_client = google_cloud_logging.Client()
             self.logger = logging_client.logger(__name__)
 
-        if gemini_location:
-            os.environ["GOOGLE_CLOUD_LOCATION"] = gemini_location
+        gemini_loc = os.environ.get("GOOGLE_CLOUD_LOCATION")
+        if gemini_loc:
+            os.environ["GOOGLE_CLOUD_LOCATION"] = gemini_loc
 
     def register_feedback(self, feedback: dict[str, Any]) -> None:
         """Collect and log feedback."""
@@ -168,7 +185,6 @@ class AgentEngineApp(A2aAgent):
         return self
 
 
-gemini_location = os.environ.get("GOOGLE_CLOUD_LOCATION")
 logs_bucket_name = os.environ.get("LOGS_BUCKET_NAME")
 agent_engine = AgentEngineApp.create(
     app=adk_app,

@@ -47,10 +47,14 @@ def _get_genai_client():
     """Lazy singleton for genai client."""
     global _cached_genai
     if _cached_genai is None:
+        import google.auth
         from google import genai
 
+        _, project = google.auth.default()
         _cached_genai = genai.Client(
-            vertexai=True, project="gemini-hack-487911", location="us-central1"
+            vertexai=True,
+            project=project,
+            location=os.environ.get("IMAGEN_LOCATION", "us-central1"),
         )
     return _cached_genai
 

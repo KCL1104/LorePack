@@ -316,10 +316,11 @@ These endpoints invoke ADK agents and stream responses via Server-Sent Events.
 
 ### SSE Event Types (Story Generation)
 
-| Event              | Description                              |
-| ------------------ | ---------------------------------------- |
-| `thinking`         | Status updates during processing         |
-| `lore_cited`       | Lorebook entries referenced              |
-| `chapter_chunk`    | Incremental text stream                  |
-| `lorebook_updated` | New auto-created lorebook entries        |
-| `done`             | Completion signal with `chapter_id`      |
+| Event              | Description                                              |
+| ------------------ | -------------------------------------------------------- |
+| `thinking`         | Status updates during processing                         |
+| `text_chunk`       | Incremental text stream from the agent                   |
+| `lore_cited`       | Existing lorebook entries referenced via RAG search      |
+| `lorebook_updated` | New auto-created lorebook entries                        |
+| `image_generated`  | Inline illustration uploaded to GCS (gs_uri + mime_type) |
+| `done`             | Completion signal with `full_text`                       |

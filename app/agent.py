@@ -1,6 +1,7 @@
 # LorePack - Collaborative Worldbuilding & Story Generation Platform
 # Root Agent: Orchestrator that dispatches user requests to specialized sub-agents
 
+import logging
 import os
 
 import google.auth
@@ -9,6 +10,45 @@ from google.adk.apps import App
 from google.adk.models import Gemini
 from google.adk.tools import LongRunningFunctionTool
 from google.genai import types
+
+_logger = logging.getLogger("lorepack.agent")
+
+
+async def _log_agent_call(callback_context):
+    """before_agent_callback: log which agent is executing.
+
+    Returns None so the agent proceeds normally.
+    """
+    try:
+        inv_id = getattr(callback_context, "invocation_id", "?")
+        _logger.info("[ADK] agent=%s invocation=%s", callback_context.agent_name, inv_id)
+    except Exception:
+        pass  # never break agent flow due to logging
+    return None
+
+
+def _on_model_error(callback_context, error):
+    """on_model_error_callback: log LLM errors and let ADK retry."""
+    _logger.error(
+        "[ADK] model_error agent=%s error=%s",
+        getattr(callback_context, "agent_name", "?"),
+        error,
+    )
+    return None  # let ADK handle the retry via HttpRetryOptions
+
+
+def _on_tool_error(callback_context, tool, args, error):
+    """on_tool_error_callback: log tool errors and return a graceful message."""
+    tool_name = getattr(tool, "name", str(tool))
+    _logger.error(
+        "[ADK] tool_error agent=%s tool=%s args=%s error=%s",
+        getattr(callback_context, "agent_name", "?"),
+        tool_name,
+        args,
+        error,
+    )
+    # Return an error dict so the agent can inform the user instead of crashing
+    return {"error": f"Tool '{tool_name}' failed: {error}. Please try again."}
 
 from app.agents.collaboration import collaboration_agent
 from app.agents.narrative_director import narrative_director_agent
@@ -63,15 +103,21 @@ and dispatch tasks to the most appropriate specialized sub-agent.
 ## Story Session Flow
 When the frontend sends a conjure request with session parameters (genre, world_era, world_essence,
 protagonist_archetype, protagonist_virtues, protagonist_shadow, spark), dispatch to the
-**narrative_director**. The Narrative Director will:
-1. Create the world concept and protagonist from the parameters
-2. Auto-create lorebook entries for all invented entities
-3. Present the world to the user and await further direction
+**narrative_director** immediately. It will:
+1. Create the world, protagonist, and lorebook entries.
+2. Present the world to the user and ask for approval.
+3. **Wait for the user to explicitly approve** before generating any chapters.
+
+The frontend has a dedicated "Approve World & Begin First Chapter" step.
+Do NOT instruct the narrative_director to skip this review — it is a required part of the flow.
 
 ## Dispatch Rules
-- Carefully analyze the user's intent and select the most appropriate sub-agent.
-- If a task involves multiple sub-agents, dispatch them in logical order.
+- Analyze the user's intent and dispatch to the single most appropriate sub-agent.
+- If a task spans multiple agents, dispatch sequentially in logical order. Examples:
+  - "Create a character and generate their portrait" → world_architect first, then visual_artist.
+  - "Start a new story and draw the main character" → narrative_director first, then visual_artist.
 - If the intent is unclear, use the request_user_input tool to ask the user for clarification.
+- Do NOT add your own commentary after a sub-agent responds — relay the sub-agent's response directly.
 - Always respond to the user in their preferred language.
 """
 
@@ -92,9 +138,12 @@ root_agent = Agent(
     tools=[
         LongRunningFunctionTool(func=request_user_input),
     ],
+    before_agent_callback=_log_agent_call,
+    on_model_error_callback=_on_model_error,
+    on_tool_error_callback=_on_tool_error,
 )
 
 app = App(
     root_agent=root_agent,
-    name="app",
+    name="lorepack",
 )

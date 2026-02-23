@@ -10,7 +10,6 @@ dependencies = [
     "a2a-sdk~=0.3.22",
     "nest-asyncio>=1.6.0,<2.0.0",
     "opentelemetry-instrumentation-google-genai>=0.1.0,<1.0.0",
-    "gcsfs>=2024.11.0",
     "google-cloud-logging>=3.12.0,<4.0.0",
     "google-cloud-aiplatform[evaluation,agent-engines]>=1.130.0",
     "protobuf>=6.31.1,<7.0.0",
@@ -32,9 +31,6 @@ dev = [
 ]
 
 [project.optional-dependencies]
-jupyter = [
-    "jupyter>=1.0.0,<2.0.0",
-]
 eval = [
     "google-adk[eval]>=1.15.0,<2.0.0",
 ]
@@ -62,7 +58,7 @@ select = [
 ignore = ["E501", "C901", "B006"] # ignore line too long, too complex
 
 [tool.ruff.lint.isort]
-known-first-party = ["app", "frontend"]
+known-first-party = ["app"]
 
 [tool.ty]
 # ty is Astral's Rust-based type checker (same team as ruff/uv)
@@ -72,7 +68,7 @@ known-first-party = ["app", "frontend"]
 python-version = "3.13"
 
 [tool.ty.src]
-exclude = [".venv/**", "notebooks/**"]
+exclude = [".venv/**"]
 
 [tool.ty.rules]
 # Ignore common issues with third-party libraries and dynamic code patterns
@@ -87,7 +83,7 @@ deprecated = "ignore"
 
 [tool.codespell]
 ignore-words-list = "rouge"
-skip = "./locust_env/*,uv.lock,.venv,./frontend,**/*.ipynb,**/package-lock.json"
+skip = "./locust_env/*,uv.lock,.venv,./frontend,**/package-lock.json"
 
 
 [build-system]
@@ -100,7 +96,7 @@ pythonpath = "."
 asyncio_default_fixture_loop_scope = "function"
 
 [tool.hatch.build.targets.wheel]
-packages = ["app","frontend"]
+packages = ["app"]
 
 [tool.agent-starter-pack]
 # Generation metadata - enables CLI commands to understand project context

@@ -1,8 +1,12 @@
-"""SSE helpers for streaming agent responses to the frontend."""
+"""SSE helpers for streaming agent responses to the frontend.
+
+Handles both text and interleaved image data from Gemini's mixed output.
+"""
 
 import json
 from collections.abc import AsyncGenerator
 
+from google.adk.artifacts import InMemoryArtifactService
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types as genai_types
@@ -17,6 +21,7 @@ def sse_event(event_type: str, data: dict) -> str:
 
 
 _session_service = InMemorySessionService()
+_artifact_service = InMemoryArtifactService()
 _runner: Runner | None = None
 
 
@@ -29,8 +34,18 @@ def _get_runner() -> Runner:
         _runner = Runner(
             app=adk_app,
             session_service=_session_service,
+            artifact_service=_artifact_service,
         )
     return _runner
+
+
+def _extract_inline_images(text: str) -> list[dict]:
+    """Try to extract inline_images from a JSON function response."""
+    try:
+        data = json.loads(text)
+        return data.get("inline_images", [])
+    except (json.JSONDecodeError, AttributeError, TypeError):
+        return []
 
 
 async def stream_agent_response(
@@ -43,7 +58,9 @@ async def stream_agent_response(
     Yields events:
       - thinking: status updates
       - text_chunk: incremental text from the agent
-      - tool_call: when the agent calls a tool (lorebook_updated, etc.)
+      - image_generated: inline image from interleaved output (gs_uri)
+      - lorebook_updated: when the agent auto-creates a lorebook entry
+      - lore_cited: when search_lore returns matching lorebook entries
       - done: final completion signal
     """
     runner = _get_runner()
@@ -75,46 +92,95 @@ async def stream_agent_response(
             user_id=user_id,
             new_message=content,
         ):
-            # Tool calls — detect lorebook/session updates
-            if event.actions and event.actions.tool_code_execution_result:
-                for _result in event.actions.tool_code_execution_result:
-                    yield sse_event("tool_call", {"tool": "code_execution"})
+            if not event.content or not event.content.parts:
+                continue
 
-            # Function calls
-            if event.actions and event.actions.requested_auth_configs:
-                pass  # skip auth requests
+            for part in event.content.parts:
+                # --- Text ---
+                if part.text:
+                    full_text += part.text
+                    yield sse_event("text_chunk", {"text": part.text})
 
-            # Text content from the agent
-            if event.content and event.content.parts:
-                for part in event.content.parts:
-                    if part.text:
-                        full_text += part.text
-                        yield sse_event("text_chunk", {"text": part.text})
-                    if part.function_call:
-                        tool_name = part.function_call.name
-                        tool_args = (
-                            dict(part.function_call.args)
-                            if part.function_call.args
-                            else {}
+                # --- Inline image from interleaved output ---
+                if hasattr(part, "inline_data") and part.inline_data and part.inline_data.data:
+                    from app.tools.gcs_tools import upload_image
+
+                    gs_uri = upload_image(
+                        part.inline_data.data,
+                        f"sse/{session_id}/{id(part)}.png",
+                    )
+                    yield sse_event(
+                        "image_generated",
+                        {
+                            "gs_uri": gs_uri,
+                            "mime_type": part.inline_data.mime_type or "image/png",
+                        },
+                    )
+
+                # --- Function calls (agent calling a tool) ---
+                if part.function_call:
+                    tool_name = part.function_call.name
+                    tool_args = (
+                        dict(part.function_call.args)
+                        if part.function_call.args
+                        else {}
+                    )
+                    if tool_name == "add_lorebook_entry":
+                        yield sse_event(
+                            "lorebook_updated",
+                            {
+                                "entry_name": tool_args.get("name", ""),
+                                "category": tool_args.get("category", ""),
+                            },
                         )
-                        if tool_name == "add_lorebook_entry":
+                    elif tool_name == "generate_chapter":
+                        yield sse_event(
+                            "thinking",
+                            {"text": "Generating illustrated chapter..."},
+                        )
+                    elif tool_name == "search_lore":
+                        yield sse_event(
+                            "thinking",
+                            {"text": "Searching lorebook for relevant lore..."},
+                        )
+                    elif tool_name == "update_session_status":
+                        yield sse_event(
+                            "thinking",
+                            {"text": f"Session status → {tool_args.get('status', '')}"},
+                        )
+
+                # --- Function responses (tool results) ---
+                if part.function_response:
+                    fn_name = getattr(part.function_response, "name", "")
+                    if fn_name == "generate_chapter":
+                        result_obj = part.function_response.response
+                        raw_result = (
+                            result_obj.get("result", "")
+                            if isinstance(result_obj, dict)
+                            else str(result_obj)
+                        )
+                        for img in _extract_inline_images(raw_result):
                             yield sse_event(
-                                "lorebook_updated",
+                                "image_generated",
                                 {
-                                    "entry_name": tool_args.get("name", ""),
-                                    "category": tool_args.get("category", ""),
+                                    "gs_uri": img.get("gs_uri", ""),
+                                    "index": img.get("index", 0),
                                 },
                             )
-                        elif tool_name == "generate_chapter":
-                            yield sse_event(
-                                "thinking", {"text": "Generating chapter..."}
-                            )
-                        elif tool_name == "update_session_status":
-                            yield sse_event(
-                                "thinking",
-                                {
-                                    "text": f"Session status → {tool_args.get('status', '')}",
-                                },
-                            )
+                    elif fn_name == "search_lore":
+                        result_obj = part.function_response.response
+                        raw_result = (
+                            result_obj.get("result", "")
+                            if isinstance(result_obj, dict)
+                            else str(result_obj)
+                        )
+                        try:
+                            entries = json.loads(raw_result) if isinstance(raw_result, str) else raw_result
+                            if isinstance(entries, list):
+                                entry_names = [e.get("name", "") for e in entries if e.get("name")]
+                                if entry_names:
+                                    yield sse_event("lore_cited", {"entries": entry_names})
+                        except (json.JSONDecodeError, TypeError):
+                            pass
 
     yield sse_event("done", {"full_text": full_text})

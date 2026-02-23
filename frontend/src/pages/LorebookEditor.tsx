@@ -6,6 +6,7 @@ import {
   getImage,
   listImages,
   updateEntry,
+  updateLorebookMeta,
   validateLorebook,
   type Entry,
   type ImageAsset,
@@ -119,6 +120,10 @@ export default function LorebookEditor() {
   const [isCreating, setIsCreating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(false);
+
+  const [editingMeta, setEditingMeta] = useState(false);
+  const [metaTitle, setMetaTitle] = useState('');
+  const [metaDescription, setMetaDescription] = useState('');
 
   const [validationResult, setValidationResult] = useState<LorebookValidation | null>(null);
   const [portraitAssets, setPortraitAssets] = useState<ImageAsset[]>([]);
@@ -440,8 +445,73 @@ export default function LorebookEditor() {
 
                 {activeLorebook ? (
                   <div className={styles.lorebookMeta}>
-                    <h3>{activeLorebook.title}</h3>
-                    <p className={styles.muted}>{activeLorebook.description || 'No description provided.'}</p>
+                    {editingMeta ? (
+                      <>
+                        <input
+                          className={styles.metaTitleInput}
+                          value={metaTitle}
+                          onChange={(e) => setMetaTitle(e.target.value)}
+                          placeholder="Lorebook title"
+                        />
+                        <input
+                          className={styles.metaDescInput}
+                          value={metaDescription}
+                          onChange={(e) => setMetaDescription(e.target.value)}
+                          placeholder="Description"
+                        />
+                        <div className={styles.metaActions}>
+                          <Button
+                            onClick={async () => {
+                              if (!selectedLorebookId || busy) return;
+                              setBusy(true);
+                              try {
+                                await updateLorebookMeta(selectedLorebookId, {
+                                  title: metaTitle.trim() || undefined,
+                                  description: metaDescription.trim() || undefined,
+                                });
+                                setEditingMeta(false);
+                                await refreshSelectedLorebook();
+                              } catch (err) {
+                                setError(err instanceof Error ? err.message : 'Failed to update lorebook.');
+                              } finally {
+                                setBusy(false);
+                              }
+                            }}
+                            disabled={busy}
+                          >
+                            {busy ? 'Saving...' : 'Save'}
+                          </Button>
+                          <Button variant="ghost" onClick={() => setEditingMeta(false)} disabled={busy}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <h3
+                          className={styles.metaTitleClickable}
+                          onClick={() => {
+                            setEditingMeta(true);
+                            setMetaTitle(activeLorebook.title);
+                            setMetaDescription(activeLorebook.description || '');
+                          }}
+                          title="Click to edit"
+                        >
+                          {activeLorebook.title}
+                        </h3>
+                        <p
+                          className={`${styles.muted} ${styles.metaDescClickable}`}
+                          onClick={() => {
+                            setEditingMeta(true);
+                            setMetaTitle(activeLorebook.title);
+                            setMetaDescription(activeLorebook.description || '');
+                          }}
+                          title="Click to edit"
+                        >
+                          {activeLorebook.description || 'No description provided. Click to add.'}
+                        </p>
+                      </>
+                    )}
                   </div>
                 ) : null}
 

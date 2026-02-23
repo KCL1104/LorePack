@@ -204,3 +204,7 @@ tools/a2a-inspector/
 # Docs
 IMPLEMENTATION_PLAN.md
 lorepack.md
+
+# Auto-generated artifacts
+deployment_metadata.json
+app/app_utils/.requirements.txt

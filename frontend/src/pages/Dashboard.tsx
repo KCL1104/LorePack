@@ -8,6 +8,7 @@ import type { Points, ShaderMaterial } from 'three';
 import { getImage, listPublicLorebooks, type PublicLorebook } from '../api';
 import { Card, SectionHeader, Tag } from '../components/ui';
 import { useAppStore } from '../stores/appStore';
+import { useAuthStore } from '../stores/authStore';
 import styles from './Dashboard.module.css';
 
 const PARTICLE_COUNT = 72;
@@ -137,7 +138,14 @@ function ParticleConstellation() {
   );
 }
 
+function getDisplayName(email: string | null | undefined): string {
+  if (!email) return 'Chronicler';
+  const local = email.split('@')[0];
+  return local.charAt(0).toUpperCase() + local.slice(1);
+}
+
 export default function Dashboard() {
+  const user = useAuthStore((state) => state.user);
   const sessions = useAppStore((state) => state.sessions);
   const lorebooks = useAppStore((state) => state.lorebooks);
   const images = useAppStore((state) => state.images);
@@ -257,7 +265,7 @@ export default function Dashboard() {
 
       <header className={styles.welcome} data-dashboard-reveal>
         <p className={styles.kicker}>The Sanctum</p>
-        <h1 className={styles.title}>Welcome back, Chronicler</h1>
+        <h1 className={styles.title}>Welcome back, {getDisplayName(user?.email)}</h1>
         <p className={styles.subtitle}>
           Observe your active tales, curate your lorebooks, and follow the latest visions
           shaping your world.

@@ -92,6 +92,16 @@ export async function getLorebook(id: string): Promise<LorebookDetail> {
   return fetchApi<LorebookDetail>(`/lorebooks/${id}`);
 }
 
+export async function updateLorebookMeta(
+  lorebookId: string,
+  data: { title?: string; description?: string },
+): Promise<void> {
+  await fetchApi<void>(`/lorebooks/${lorebookId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
 export async function updateEntry(
   lorebookId: string,
   entryId: string,

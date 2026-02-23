@@ -32,6 +32,10 @@ interface AppState {
   images: ImageAsset[];
   fetchImages: (filters?: { asset_type?: string }) => Promise<void>;
 
+  // Layout
+  sidebarDimmed: boolean;
+  setSidebarDimmed: (dimmed: boolean) => void;
+
   // Toast notifications
   toasts: Toast[];
   addToast: (toast: Omit<Toast, 'id'>) => void;
@@ -76,6 +80,10 @@ export const useAppStore = create<AppState>((set) => ({
     const images = await listImages(filters);
     set({ images });
   },
+
+  // Layout
+  sidebarDimmed: false,
+  setSidebarDimmed: (dimmed) => set({ sidebarDimmed: dimmed }),
 
   // Toast notifications
   toasts: [],

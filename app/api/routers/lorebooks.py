@@ -89,6 +89,32 @@ async def get_lorebook(
     return lorebook
 
 
+class LorebookUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+
+
+@router.patch("/{lorebook_id}")
+async def update_lorebook(
+    lorebook_id: str,
+    body: LorebookUpdate,
+    current_user: CurrentUser,
+):
+    """Update lorebook title and/or description."""
+    db = get_firestore_client()
+    _require_owned_lorebook(db, lorebook_id, current_user.uid)
+
+    updates = body.model_dump(exclude_none=True)
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    from datetime import UTC, datetime
+
+    updates["updated_at"] = datetime.now(UTC).isoformat()
+    db.collection("lorebooks").document(lorebook_id).update(updates)
+    return db.collection("lorebooks").document(lorebook_id).get().to_dict()
+
+
 @router.post("/{lorebook_id}/entries", status_code=201)
 async def create_entry(
     lorebook_id: str,

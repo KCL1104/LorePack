@@ -72,12 +72,20 @@ export interface SessionSummary {
   updated_at: string;
 }
 
+export interface InlineImage {
+  index: number;
+  gs_uri: string;
+  mime_type?: string;
+  position?: number;
+}
+
 export interface Chapter {
   chapter_number: number;
   chapter_title: string;
   body: string;
   characters_featured: string[];
   lore_referenced: string[];
+  inline_images?: InlineImage[];
 }
 
 export interface SessionDetail extends SessionSummary {
@@ -95,6 +103,8 @@ export interface ConjureParams {
   protagonist_virtues: string[];
   protagonist_shadow: string;
   spark?: string;
+  chapter_length?: string;
+  writing_style?: string;
 }
 
 export interface GenerateImageParams {
@@ -144,12 +154,18 @@ export interface LorebookValidation {
 }
 
 export interface SSEEvent {
-  type: 'thinking' | 'text_chunk' | 'lorebook_updated' | 'tool_call' | 'done';
+  type: 'thinking' | 'text_chunk' | 'image_generated' | 'lore_cited' | 'lorebook_updated' | 'done';
   text?: string;
   full_text?: string;
+  // lorebook_updated
   entry_name?: string;
   category?: string;
-  tool?: string;
+  // image_generated
+  gs_uri?: string;
+  mime_type?: string;
+  index?: number;
+  // lore_cited
+  entries?: string[];
 }
 
 export interface Toast {

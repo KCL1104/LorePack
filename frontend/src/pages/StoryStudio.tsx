@@ -28,6 +28,8 @@ interface ConjureForm {
   protagonistShadow: string;
   customProtagonistShadow: string;
   spark: string;
+  chapterLength: string;
+  writingStyle: string;
 }
 
 interface ChatMessage {
@@ -36,11 +38,18 @@ interface ChatMessage {
   text: string;
 }
 
+interface ChapterImage {
+  gs_uri: string;
+  mime_type: string;
+  index: number;
+}
+
 interface ChapterSegment {
   id: string;
   title: string;
   body: string;
   loreRefs: string[];
+  images: ChapterImage[];
 }
 
 interface LoreUpdate {
@@ -120,6 +129,20 @@ const SHADOWS: SelectOption[] = [
   { id: 'custom', label: 'Custom' },
 ];
 
+const CHAPTER_LENGTHS: SelectOption[] = [
+  { id: 'short', label: 'Short', description: '~500 words per chapter' },
+  { id: 'medium', label: 'Medium', description: '~1000 words per chapter' },
+  { id: 'long', label: 'Long', description: '~2000 words per chapter' },
+];
+
+const WRITING_STYLES: SelectOption[] = [
+  { id: 'literary_fiction', label: 'Literary Fiction', description: 'Nuanced prose with psychological depth.' },
+  { id: 'light_novel', label: 'Light Novel', description: 'Dialogue-driven, fast-paced, character-centric.' },
+  { id: 'epic_fantasy', label: 'Epic Fantasy', description: 'Rich descriptions, grand scale, formal tone.' },
+  { id: 'pulp_adventure', label: 'Pulp Adventure', description: 'Action-forward, vivid, cinematic pacing.' },
+  { id: 'poetic_prose', label: 'Poetic Prose', description: 'Lyrical, metaphor-rich, atmospheric.' },
+];
+
 const RANDOM_SPARKS = [
   'An eclipse seals the city gates, and only one bloodline can open them again.',
   'A forbidden atlas reveals lands that appear only when no one remembers them.',
@@ -143,6 +166,8 @@ const INITIAL_FORM: ConjureForm = {
   protagonistShadow: '',
   customProtagonistShadow: '',
   spark: '',
+  chapterLength: 'medium',
+  writingStyle: 'literary_fiction',
 };
 
 function formatLabel(value: string): string {
@@ -270,6 +295,12 @@ export default function StoryStudio() {
   const [messageDraft, setMessageDraft] = useState('');
 
   const [contextCollapsed, setContextCollapsed] = useState(false);
+  const [worldApproved, setWorldApproved] = useState(true);
+  const [worldPreview, setWorldPreview] = useState<{
+    text: string;
+    loreRefs: string[];
+    images: ChapterImage[];
+  } | null>(null);
 
   const stepDirectionRef = useRef(1);
   const previousStepRef = useRef(0);
@@ -277,6 +308,13 @@ export default function StoryStudio() {
 
   const fetchSessions = useAppStore((state) => state.fetchSessions);
   const fetchSession = useAppStore((state) => state.fetchSession);
+  const setSidebarDimmed = useAppStore((state) => state.setSidebarDimmed);
+
+  // Dim sidebar during conjure phase
+  useEffect(() => {
+    setSidebarDimmed(phase === 'conjure');
+    return () => setSidebarDimmed(false);
+  }, [phase, setSidebarDimmed]);
 
   const canProceedStep = useMemo(() => {
     if (stepIndex === 0) return Boolean(form.genre) && (form.genre !== 'custom' || Boolean(form.customGenre.trim()));
@@ -413,13 +451,11 @@ export default function StoryStudio() {
     );
   };
 
-  const recordLoreUpdate = (event: SSEEvent, localRefs: Set<string>) => {
+  const recordLoreUpdate = (event: SSEEvent) => {
     const entryName = event.entry_name;
     if (!entryName) return;
     const category = event.category || 'other';
     const refText = `${entryName} (${category})`;
-
-    localRefs.add(refText);
 
     setLoreUpdates((prev) => [
       { id: createId('lore'), entryName, category },
@@ -429,17 +465,18 @@ export default function StoryStudio() {
     appendChatMessage({
       id: createId('sys'),
       role: 'system',
-      text: `Lorebook updated: ${refText}`,
+      text: `✦ Lorebook updated: ${refText}`,
     });
   };
 
   const consumeStoryStream = async (
     stream: AsyncGenerator<SSEEvent>,
     aiMessageId: string,
-    mode: 'conjure' | 'chapter',
+    mode: 'conjure' | 'review' | 'chapter',
   ) => {
     let streamBuffer = '';
     const streamLoreRefs = new Set<string>();
+    const streamImages: ChapterImage[] = [];
 
     for await (const event of stream) {
       if (event.type === 'thinking') {
@@ -451,8 +488,22 @@ export default function StoryStudio() {
         updateChatMessageText(aiMessageId, streamBuffer);
       }
 
+      if (event.type === 'lore_cited' && event.entries) {
+        for (const name of event.entries) {
+          streamLoreRefs.add(name);
+        }
+      }
+
       if (event.type === 'lorebook_updated') {
-        recordLoreUpdate(event, streamLoreRefs);
+        recordLoreUpdate(event);
+      }
+
+      if (event.type === 'image_generated' && event.gs_uri) {
+        streamImages.push({
+          gs_uri: event.gs_uri,
+          mime_type: event.mime_type || 'image/png',
+          index: event.index ?? streamImages.length,
+        });
       }
 
       if (event.type === 'done') {
@@ -460,25 +511,32 @@ export default function StoryStudio() {
         updateChatMessageText(aiMessageId, finalText || 'No response text was returned by the director.');
 
         if (finalText) {
-          setChapters((prev) => {
-            const title =
-              mode === 'conjure'
-                ? 'Prologue — World Conjuration'
-                : `Chapter ${Math.max(prev.length, 1)}`;
-
-            return [
+          if (mode === 'conjure') {
+            setWorldPreview({
+              text: finalText,
+              loreRefs: Array.from(streamLoreRefs),
+              images: streamImages,
+            });
+          } else if (mode === 'chapter') {
+            setChapters((prev) => [
               ...prev,
               {
                 id: createId('chapter'),
-                title,
+                title: `Chapter ${Math.max(prev.length, 1)}`,
                 body: finalText,
                 loreRefs: Array.from(streamLoreRefs),
+                images: streamImages,
               },
-            ];
-          });
+            ]);
+          }
+          // mode === 'review' → chat-only, no chapter or preview mutation
         }
 
-        setStatusText('The Narrative Director awaits your next instruction.');
+        setStatusText(
+          mode === 'conjure'
+            ? 'World conjured. Review the lore, then approve or request changes.'
+            : 'The Narrative Director awaits your next instruction.',
+        );
       }
     }
   };
@@ -499,6 +557,8 @@ export default function StoryStudio() {
     protagonist_virtues: resolveCustomMulti(form.protagonistVirtues, form.customProtagonistVirtues),
     protagonist_shadow: resolveCustomSingle(form.protagonistShadow, form.customProtagonistShadow),
     spark: form.spark.trim() || undefined,
+    chapter_length: form.chapterLength,
+    writing_style: form.writingStyle.replace(/_/g, ' '),
   });
 
   const handleBeginTale = async () => {
@@ -508,6 +568,8 @@ export default function StoryStudio() {
     setStatusText('Preparing conjuration ritual...');
     setPhase('desk');
     setContextCollapsed(false);
+    setWorldApproved(false);
+    setWorldPreview(null);
     setIsGenerating(true);
 
     const aiMessageId = createId('ai');
@@ -555,7 +617,7 @@ export default function StoryStudio() {
     appendChatMessage({ id: aiMessageId, role: 'ai', text: '' });
 
     try {
-      await consumeStoryStream(sendMessage(sessionId, trimmed), aiMessageId, 'chapter');
+      await consumeStoryStream(sendMessage(sessionId, trimmed), aiMessageId, worldApproved ? 'chapter' : 'review');
       await fetchSession(sessionId);
       await fetchSessions();
     } catch (streamError) {
@@ -563,6 +625,47 @@ export default function StoryStudio() {
       setError(message);
       appendChatMessage({ id: createId('sys'), role: 'system', text: `Message failed: ${message}` });
       setStatusText('Transmission interrupted.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleApproveWorld = async () => {
+    if (!sessionId || isGenerating) return;
+
+    if (worldPreview) {
+      setChapters((prev) => [
+        {
+          id: createId('chapter'),
+          title: 'Prologue — World Conjuration',
+          body: worldPreview.text,
+          loreRefs: worldPreview.loreRefs,
+          images: worldPreview.images,
+        },
+        ...prev,
+      ]);
+      setWorldPreview(null);
+    }
+
+    setWorldApproved(true);
+    setError(null);
+    setIsGenerating(true);
+    setStatusText('The Narrative Director begins your tale...');
+
+    const beginText = 'The world is approved. Begin writing the first chapter.';
+    appendChatMessage({ id: createId('user'), role: 'user', text: beginText });
+    const aiMessageId = createId('ai');
+    appendChatMessage({ id: aiMessageId, role: 'ai', text: '' });
+
+    try {
+      await consumeStoryStream(sendMessage(sessionId, beginText), aiMessageId, 'chapter');
+      await fetchSession(sessionId);
+      await fetchSessions();
+    } catch (streamError) {
+      const message = streamError instanceof Error ? streamError.message : 'Failed to begin chapter.';
+      setError(message);
+      appendChatMessage({ id: createId('sys'), role: 'system', text: `Error: ${message}` });
+      setStatusText('Chapter generation interrupted.');
     } finally {
       setIsGenerating(false);
     }
@@ -759,13 +862,37 @@ export default function StoryStudio() {
             onChange={(event) => updateForm('spark', event.target.value)}
             placeholder="Describe the event that ignites your tale..."
             multiline
-            rows={6}
+            rows={5}
           />
 
           <div className={styles.sparkActions}>
             <Button variant="ghost" onClick={handleRandomSpark}>
               Fate&apos;s Hand
             </Button>
+          </div>
+
+          <p className={styles.blockLabel}>Chapter Length</p>
+          <div className={styles.tagRow}>
+            {CHAPTER_LENGTHS.map((opt) => (
+              <Tag
+                key={opt.id}
+                label={`${opt.label} (${opt.description})`}
+                selected={form.chapterLength === opt.id}
+                onClick={() => updateForm('chapterLength', opt.id)}
+              />
+            ))}
+          </div>
+
+          <p className={styles.blockLabel}>Writing Style</p>
+          <div className={styles.tagRow}>
+            {WRITING_STYLES.map((opt) => (
+              <Tag
+                key={opt.id}
+                label={opt.label}
+                selected={form.writingStyle === opt.id}
+                onClick={() => updateForm('writingStyle', opt.id)}
+              />
+            ))}
           </div>
         </div>
 
@@ -778,6 +905,8 @@ export default function StoryStudio() {
             <li><strong>Archetype:</strong> {formatLabel(form.protagonistArchetype)} {form.protagonistArchetype === 'custom' && form.customProtagonistArchetype ? `(${form.customProtagonistArchetype})` : ''}</li>
             <li><strong>Virtues:</strong> {form.protagonistVirtues.map(formatLabel).join(', ') || 'Unset'} {form.protagonistVirtues.includes('custom') && form.customProtagonistVirtues ? `(${form.customProtagonistVirtues})` : ''}</li>
             <li><strong>Shadow:</strong> {formatLabel(form.protagonistShadow)} {form.protagonistShadow === 'custom' && form.customProtagonistShadow ? `(${form.customProtagonistShadow})` : ''}</li>
+            <li><strong>Length:</strong> {formatLabel(form.chapterLength)}</li>
+            <li><strong>Style:</strong> {formatLabel(form.writingStyle)}</li>
           </ul>
         </Card>
       </div>
@@ -895,7 +1024,23 @@ export default function StoryStudio() {
             <Card hoverable={false} className={styles.scrollPanel}>
               <SectionHeader title="Narrative Scroll" />
 
-              {selectedChapter ? (
+              {!worldApproved && worldPreview ? (
+                <article className={styles.chapterBody}>
+                  <span className={styles.previewBadge}>World Preview</span>
+                  <p className={styles.chapterText}>{worldPreview.text}</p>
+
+                  {worldPreview.loreRefs.length > 0 ? (
+                    <div className={styles.loreCited}>
+                      <p className={styles.blockLabel}>Lore referenced</p>
+                      <ul>
+                        {worldPreview.loreRefs.map((ref) => (
+                          <li key={ref}>{ref}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </article>
+              ) : selectedChapter ? (
                 <article className={styles.chapterBody}>
                   <h3 className={styles.chapterTitle}>{selectedChapter.title}</h3>
                   <p className={styles.chapterText}>{selectedChapter.body}</p>
@@ -936,25 +1081,60 @@ export default function StoryStudio() {
                 )}
               </div>
 
-              <div className={styles.chatComposer}>
-                <Input
-                  value={messageDraft}
-                  onChange={(event) => setMessageDraft(event.target.value)}
-                  placeholder="Direct the next scene, challenge, or character turn..."
-                  multiline
-                  rows={4}
-                  className={styles.chatInput}
-                />
-                <Button onClick={handleSendDirection} disabled={!sessionId || isGenerating || !messageDraft.trim()}>
-                  Send Direction
-                </Button>
-              </div>
+              {!worldApproved ? (
+                <div className={styles.reviewActions}>
+                  <p className={styles.reviewPrompt}>
+                    Review the conjured world. Request changes below, or approve to begin your tale.
+                  </p>
+                  <div className={styles.chatComposer}>
+                    <Input
+                      value={messageDraft}
+                      onChange={(event) => setMessageDraft(event.target.value)}
+                      placeholder="Request adjustments to the world, characters, or lore..."
+                      multiline
+                      rows={3}
+                      className={styles.chatInput}
+                    />
+                    <Button
+                      variant="ghost"
+                      onClick={handleSendDirection}
+                      disabled={!sessionId || isGenerating || !messageDraft.trim()}
+                    >
+                      Send Revisions
+                    </Button>
+                  </div>
+                  <Button
+                    onClick={handleApproveWorld}
+                    disabled={!sessionId || isGenerating}
+                  >
+                    Approve World & Begin First Chapter
+                  </Button>
+                </div>
+              ) : (
+                <div className={styles.chatComposer}>
+                  <Input
+                    value={messageDraft}
+                    onChange={(event) => setMessageDraft(event.target.value)}
+                    placeholder="Direct the next scene, challenge, or character turn..."
+                    multiline
+                    rows={4}
+                    className={styles.chatInput}
+                  />
+                  <Button onClick={handleSendDirection} disabled={!sessionId || isGenerating || !messageDraft.trim()}>
+                    Send Direction
+                  </Button>
+                </div>
+              )}
             </Card>
           </div>
 
           <Card hoverable={false} className={styles.bottomBar} data-desk-reveal>
             <div className={styles.chapterNav}>
-              {chapters.length === 0 ? <span className={styles.navHint}>○ No chapters yet</span> : null}
+              {!worldApproved && worldPreview ? (
+                <span className={styles.navHint}>✦ World preview — awaiting approval</span>
+              ) : chapters.length === 0 ? (
+                <span className={styles.navHint}>○ No chapters yet</span>
+              ) : null}
               {chapters.map((chapter, index) => (
                 <button
                   key={chapter.id}

@@ -92,7 +92,8 @@ def generate_character_image(
 
     resolved_owner_uid = resolve_owner_uid(owner_uid)
 
-    prompt = f"{art_style}, {pose} of {character_name}: {appearance_description}"
+    _quality_suffix = "high quality, detailed, no text, no watermark, no signature, no extra fingers, no deformed hands"
+    prompt = f"{art_style}, {pose} of {character_name}: {appearance_description}. {_quality_suffix}"
     safe_name = character_name.lower().replace(" ", "_")
     gcs_path = f"characters/{safe_name}.png"
 
@@ -147,7 +148,8 @@ def generate_scene_image(
 
     resolved_owner_uid = resolve_owner_uid(owner_uid)
 
-    prompt = f"{art_style}, {mood} mood: {scene_description}"
+    _quality_suffix = "high quality, detailed, no text, no watermark, no signature"
+    prompt = f"{art_style}, {mood} mood: {scene_description}. {_quality_suffix}"
     safe_name = scene_name.lower().replace(" ", "_")
     gcs_path = f"scenes/{safe_name}.png"
 

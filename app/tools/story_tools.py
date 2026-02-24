@@ -304,11 +304,15 @@ def generate_chapter(
             f'- Start your response with "# " followed by a compelling chapter title.\n'
             f"- Generate 1-2 vivid scene illustrations at key dramatic moments.\n"
             f"  Place images naturally between paragraphs at impactful story beats.\n"
+            f"- Illustrations must NOT contain any text, watermarks, or signatures.\n"
         )
         config = types.GenerateContentConfig(
             temperature=0.85,
             max_output_tokens=_story_max_output_tokens(),
             response_modalities=["TEXT", "IMAGE"],
+            thinking_config=types.ThinkingConfig(
+                thinking_level=types.ThinkingLevel.LOW,
+            ),
         )
     else:
         prompt = (
@@ -334,6 +338,9 @@ def generate_chapter(
         config = types.GenerateContentConfig(
             temperature=0.5,
             max_output_tokens=_story_max_output_tokens(),
+            thinking_config=types.ThinkingConfig(
+                thinking_level=types.ThinkingLevel.LOW,
+            ),
         )
 
     response = _get_genai_client().models.generate_content(
@@ -370,6 +377,8 @@ def generate_chapter(
 
     chapter["lorebook_id"] = lorebook_id
     chapter["premise"] = premise
+    chapter["style"] = style
+    chapter["length"] = length
     chapter["owner_uid"] = resolved_owner_uid
 
     # Step 5: Save to Firestore for story continuity
@@ -428,14 +437,31 @@ def continue_story(lorebook_id: str, direction: str = "", owner_uid: str = "") -
     last_chapter = chapters[0].to_dict()
     last_number = last_chapter.get("chapter_number", 0)
 
-    # Build continuation premise from previous chapter
+    # Gather arc context from all previous chapters (titles + premises)
+    all_chapters = list(
+        chapters_ref.order_by("chapter_number").stream()
+    )
+    arc_lines: list[str] = []
+    for ch_snap in all_chapters:
+        ch = ch_snap.to_dict()
+        ch_num = ch.get("chapter_number", "?")
+        ch_title = ch.get("chapter_title", f"Chapter {ch_num}")
+        ch_premise = ch.get("premise", "")
+        arc_lines.append(f"  Ch{ch_num}: {ch_title} — {ch_premise}")
+    arc_summary = "\n".join(arc_lines[-6:])  # last 6 chapters max
+
+    # Build continuation premise with full arc context
+    body = last_chapter.get("body", "")
+    last_paragraphs = "\n".join(body.split("\n")[-3:])
+    base_context = (
+        f"## Story Arc So Far\n{arc_summary}\n\n"
+        f"## Previous Chapter Ending (Chapter {last_number})\n{last_paragraphs}"
+    )
+
     if direction:
-        premise = direction
+        premise = f"{base_context}\n\n## Direction for Next Chapter\n{direction}"
     else:
-        # Extract the last few paragraphs as context for continuation
-        body = last_chapter.get("body", "")
-        last_paragraphs = "\n".join(body.split("\n")[-3:])
-        premise = f"Continue from where Chapter {last_number} left off. Previous ending: {last_paragraphs}"
+        premise = f"{base_context}\n\nContinue naturally from where Chapter {last_number} left off."
 
     return generate_chapter(
         lorebook_id=lorebook_id,

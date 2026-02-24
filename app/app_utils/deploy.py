@@ -386,6 +386,8 @@ def deploy_agent_engine_app(
         resource_limits={"cpu": cpu, "memory": memory},
         container_concurrency=container_concurrency,
         identity_type=IdentityType.AGENT_IDENTITY if agent_identity else None,
+        agent_framework="google-adk",
+        python_version="3.13",
     )
 
     # Check if an agent with this name already exists

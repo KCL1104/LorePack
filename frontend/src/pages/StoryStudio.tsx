@@ -70,8 +70,12 @@ const GENRES: SelectOption[] = [
   { id: 'epic_fantasy', label: 'Epic Fantasy', description: 'Great empires, ancient oaths, sweeping destinies.' },
   { id: 'steampunk', label: 'Steampunk', description: 'Brass cities, alchemy engines, sky fleets.' },
   { id: 'sci_fi', label: 'Sci-Fi', description: 'Orbiting citadels and machine prophets.' },
+  { id: 'cosmic_sci_fi', label: 'Cosmic Sci-Fi', description: 'Star empires, alien civilizations, the void between worlds.' },
   { id: 'mythic_horror', label: 'Mythic Horror', description: 'Eldritch truths beneath sacred traditions.' },
   { id: 'historical_arcana', label: 'Historical Arcana', description: 'Hidden magic threaded through real history.' },
+  { id: 'alternate_history', label: 'Alternate History', description: 'History took a different turn. No magic — just a world that never was.' },
+  { id: 'urban_fantasy', label: 'Urban Fantasy', description: 'Modern cities with supernatural undercurrents.' },
+  { id: 'wuxia_xianxia', label: 'Wuxia / Xianxia', description: 'Martial arts, spiritual cultivation, heaven-defying heroes.' },
   { id: 'custom', label: 'Custom', description: 'Forge your own path...' },
 ];
 

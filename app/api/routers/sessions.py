@@ -56,6 +56,35 @@ GENRE_GUIDE: dict[str, str] = {
         "Tone: grounded yet wondrous, intellectually rich. Think Renaissance sorcerers, "
         "Silk Road enchantments, or Victorian occultists. History is the skeleton; magic is the marrow."
     ),
+    "alternate_history": (
+        "Alternate History — a world where a pivotal historical event went differently, "
+        "and the consequences reshaped civilization. No magic or supernatural elements — "
+        "the drama comes from plausible divergence: geopolitics, technology, culture. "
+        "Tone: grounded, speculative, richly detailed. Think 'what if the Mongol Empire never fell', "
+        "'what if the Industrial Revolution started in China', or 'what if Rome never collapsed'. "
+        "Every detail must feel historically plausible even though the timeline is fictional."
+    ),
+    "urban_fantasy": (
+        "Urban Fantasy — modern cities hide supernatural undercurrents beneath everyday life. "
+        "Vampires run nightclubs, fae courts hold territory in subway tunnels, witches operate "
+        "behind ordinary storefronts. Tone: gritty, fast-paced, contemporary. "
+        "Think neon-lit alleyways, uneasy truces between human authorities and hidden factions, "
+        "and protagonists who straddle both worlds. The mundane and magical collide daily."
+    ),
+    "cosmic_sci_fi": (
+        "Cosmic Sci-Fi — vast interstellar scope spanning star systems, alien civilizations, "
+        "and the deep void between worlds. Galactic empires, first-contact dilemmas, "
+        "generation ships, and the loneliness of deep space. Tone: awe-inspiring, philosophical, epic. "
+        "Think space opera with hard-science grounding: relativistic travel, Dyson spheres, "
+        "xenobiology, and the question of humanity's place in a universe teeming with intelligence."
+    ),
+    "wuxia_xianxia": (
+        "Wuxia / Xianxia — a world of martial arts masters, spiritual cultivation, and heaven-defying heroes. "
+        "Sects and clans compete for supremacy; cultivation realms define power hierarchies. "
+        "Tone: mythic, honor-driven, vertically scaled. Think wandering swordsmen seeking the Dao, "
+        "immortal tribulations, forbidden techniques, sect politics, and the tension between "
+        "righteous and demonic paths. Power is earned through discipline, sacrifice, and enlightenment."
+    ),
 }
 
 ESSENCE_GUIDE: dict[str, str] = {

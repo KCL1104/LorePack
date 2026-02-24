@@ -11,23 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import asyncio
 import logging
 import os
 from typing import Any
 
-import nest_asyncio
 import vertexai
-from a2a.types import AgentCapabilities, AgentCard, AgentSkill, TransportProtocol
 from dotenv import load_dotenv
-from google.adk.a2a.executor.a2a_agent_executor import A2aAgentExecutor
-from google.adk.a2a.utils.agent_card_builder import AgentCardBuilder
-from google.adk.apps import App
-from google.adk.artifacts import GcsArtifactService, InMemoryArtifactService
-from google.adk.runners import Runner
-from google.adk.sessions import InMemorySessionService
-from google.cloud import logging as google_cloud_logging
-from vertexai.preview.reasoning_engines import A2aAgent
+from vertexai.agent_engines import AdkApp
 
 from app.agent import app as adk_app
 from app.app_utils.telemetry import setup_telemetry
@@ -41,112 +31,11 @@ def _is_integration_test() -> bool:
     return os.getenv("INTEGRATION_TEST", "").lower() in {"1", "true", "yes"}
 
 
-class AgentEngineApp(A2aAgent):
-    @staticmethod
-    def create(
-        app: App | None = None,
-        artifact_service: Any = None,
-        session_service: Any = None,
-    ) -> Any:
-        """Create an AgentEngineApp instance.
+class AgentEngineApp(AdkApp):
+    """LorePack Agent Engine application.
 
-        This method detects whether it's being called in an async context (like notebooks
-        or Agent Engine) and handles agent card creation appropriately.
-        """
-        if app is None:
-            app = adk_app
-
-        def create_runner() -> Runner:
-            """Create a Runner for the AgentEngineApp."""
-            return Runner(
-                app=app,
-                session_service=session_service,
-                artifact_service=artifact_service,
-            )
-
-        # Build agent card in an async context if needed
-        try:
-            asyncio.get_running_loop()
-            # Running event loop detected - enable nested asyncio.run()
-            nest_asyncio.apply()
-        except RuntimeError:
-            pass
-
-        agent_card = asyncio.run(AgentEngineApp.build_agent_card(app=app))
-
-        return AgentEngineApp(
-            agent_executor_builder=lambda: A2aAgentExecutor(runner=create_runner()),
-            agent_card=agent_card,
-        )
-
-    @staticmethod
-    async def build_agent_card(app: App) -> AgentCard:
-        """Builds the Agent Card dynamically from the app."""
-        agent_card_builder = AgentCardBuilder(
-            agent=app.root_agent,
-            # Agent Engine does not support streaming yet
-            capabilities=AgentCapabilities(streaming=False),
-            rpc_url="http://localhost:9999/",
-            agent_version=os.getenv("AGENT_VERSION", "0.1.0"),
-        )
-        agent_card = await agent_card_builder.build()
-        agent_card.preferred_transport = TransportProtocol.http_json  # Http Only.
-        agent_card.supports_authenticated_extended_card = True
-
-        # Declare LorePack-specific A2A skills for agent discovery
-        agent_card.skills.extend(
-            [
-                AgentSkill(
-                    id="lorebook_sharing",
-                    name="Lorebook Sharing",
-                    description=(
-                        "Can export and import worldbuilding lorebooks. "
-                        "Public lorebook entries can be shared with other agents "
-                        "via the A2A protocol for cross-user collaboration."
-                    ),
-                    tags=["worldbuilding", "lorebook", "sharing", "export", "import"],
-                    examples=[
-                        "Share my fantasy lorebook with another user",
-                        "Import a lorebook from another agent",
-                        "List all publicly available lorebooks",
-                    ],
-                ),
-                AgentSkill(
-                    id="character_crossover",
-                    name="Character Crossover",
-                    description=(
-                        "Can negotiate character crossover rules between lorebooks. "
-                        "Supports proposing, evaluating, and accepting crossover of "
-                        "characters from one worldbuilding universe into another, "
-                        "with automatic conflict detection."
-                    ),
-                    tags=["crossover", "character", "negotiation", "collaboration"],
-                    examples=[
-                        "Propose a crossover of Aria Stormwind into the sci-fi universe",
-                        "Check if these characters conflict with my existing lore",
-                        "Accept the crossover proposal and merge characters",
-                    ],
-                ),
-                AgentSkill(
-                    id="story_generation",
-                    name="Illustrated Story Generation",
-                    description=(
-                        "Can conjure a new story world from genre, era, and protagonist parameters, "
-                        "then generate illustrated chapters grounded in lorebook entries via RAG. "
-                        "Uses Gemini interleaved output for inline scene illustrations. "
-                        "Supports configurable chapter length and writing style."
-                    ),
-                    tags=["story", "chapter", "generation", "illustration", "RAG", "narrative"],
-                    examples=[
-                        "Conjure a dark fantasy world with a warrior protagonist",
-                        "Generate Chapter 2 of the ongoing story",
-                        "Continue the story with an epic battle scene",
-                    ],
-                ),
-            ]
-        )
-
-        return agent_card
+    Extends AdkApp with feedback collection and telemetry.
+    """
 
     def set_up(self) -> None:
         """Initialize the agent engine app with logging and telemetry."""
@@ -162,12 +51,10 @@ class AgentEngineApp(A2aAgent):
         if integration_test_mode:
             self.logger = logging.getLogger(__name__)
         else:
+            from google.cloud import logging as google_cloud_logging
+
             logging_client = google_cloud_logging.Client()
             self.logger = logging_client.logger(__name__)
-
-        gemini_loc = os.environ.get("GOOGLE_CLOUD_LOCATION")
-        if gemini_loc:
-            os.environ["GOOGLE_CLOUD_LOCATION"] = gemini_loc
 
     def register_feedback(self, feedback: dict[str, Any]) -> None:
         """Collect and log feedback."""
@@ -185,13 +72,4 @@ class AgentEngineApp(A2aAgent):
         return self
 
 
-logs_bucket_name = os.environ.get("LOGS_BUCKET_NAME")
-agent_engine = AgentEngineApp.create(
-    app=adk_app,
-    artifact_service=(
-        GcsArtifactService(bucket_name=logs_bucket_name)
-        if logs_bucket_name
-        else InMemoryArtifactService()
-    ),
-    session_service=InMemorySessionService(),
-)
+agent_engine = AgentEngineApp(agent=adk_app.root_agent)

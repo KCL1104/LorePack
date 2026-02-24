@@ -5,6 +5,7 @@ from google.adk.agents import Agent
 from google.adk.models import Gemini
 from google.genai import types
 
+from app.agents._callbacks import on_tool_error
 from app.tools.image_tools import (
     generate_character_image,
     generate_scene_image,
@@ -50,10 +51,19 @@ For **scenes** (scene_description parameter):
 - **pose** for characters: "portrait" (default, half-body), "full_body", "action"
 - **mood** for scenes: "neutral" (default), "peaceful", "ominous", "epic", "mysterious", "melancholic"
 
+### Quality Safeguards
+Always append this quality suffix to the END of every image prompt you construct (both character and scene):
+`high quality, detailed, no text, no watermark, no signature, no extra fingers, no deformed hands`
+This suffix is mandatory and fixed — do NOT omit it or let the user override it.
+
+## Error Handling
+- If an image generation tool fails, inform the user which character/scene failed and suggest retrying with a slightly simplified prompt.
+- If get_character_visual_history fails, proceed without history but warn the user that visual consistency may vary.
+
 ## Working Principles
 - NEVER generate an image without first reading the lorebook entry — you need concrete details.
 - Always set the lorebook_id parameter when calling image generation tools.
-- Always respond in the user's preferred language.
+- Detect the language of the user's message and respond in that same language. If the message contains a "Response language:" directive, follow it.
 """
 
 visual_artist_agent = Agent(
@@ -61,6 +71,11 @@ visual_artist_agent = Agent(
     model=Gemini(
         model="gemini-3-flash-preview",
         retry_options=types.HttpRetryOptions(attempts=3),
+    ),
+    generate_content_config=types.GenerateContentConfig(
+        thinking_config=types.ThinkingConfig(
+            thinking_level=types.ThinkingLevel.LOW,
+        ),
     ),
     description="Visual Artist: Transforms text-based settings into character portraits and scene concept art.",
     instruction=VISUAL_ARTIST_INSTRUCTION,
@@ -70,4 +85,5 @@ visual_artist_agent = Agent(
         get_character_visual_history,
         get_lorebook,
     ],
+    on_tool_error_callback=on_tool_error,
 )

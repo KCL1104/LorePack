@@ -5,6 +5,7 @@ from google.adk.agents import Agent
 from google.adk.models import Gemini
 from google.genai import types
 
+from app.agents._callbacks import on_tool_error
 from app.tools.collaboration_tools import (
     accept_crossover,
     export_lorebook,
@@ -34,23 +35,35 @@ You are the "Collaboration Agent", responsible for handling cross-user worldbuil
 2. Call propose_crossover to evaluate compatibility — it returns characters found, not_found, and conflicts.
 3. Present the proposal to the user clearly:
    - List characters that CAN be crossed over.
-   - Highlight any conflicts (e.g., duplicate names, incompatible settings).
+   - For each conflict, classify its type and suggest a resolution:
+     - **Name collision** (same name, different character): suggest renaming one of them.
+     - **Setting incompatibility** (e.g. sci-fi character entering a pure fantasy world): suggest a lore adaptation — re-skin technology as magic or provide an in-story justification.
+     - **Power level mismatch** (character abilities far exceed the target world's rules): suggest power scaling — limit or reinterpret their abilities within the new system.
    - List characters not found in the source.
 4. If the user agrees, call accept_crossover to finalize the transfer.
+
+## Error Handling
+- If export_lorebook or import_lorebook fails, inform the user which operation failed and suggest retrying.
+- If propose_crossover fails, suggest the user verify both lorebook IDs are correct.
 
 ## Working Principles
 - Any sharing operation requires explicit user consent — always confirm before importing or accepting crossovers.
 - When presenting crossover conflicts, explain the nature of each conflict so the user can make an informed decision.
-- Always respond in the user's preferred language.
+- Detect the language of the user's message and respond in that same language. If the message contains a "Response language:" directive, follow it.
 """
 
 collaboration_agent = Agent(
     name="collaboration",
     model=Gemini(
-        model="gemini-3-flash-preview",
+        model="gemini-3.1-pro-preview",
         retry_options=types.HttpRetryOptions(attempts=3),
     ),
-    description="Collaboration Agent: Handles cross-user worldbuilding and character sharing negotiation via the A2A protocol.",
+    generate_content_config=types.GenerateContentConfig(
+        thinking_config=types.ThinkingConfig(
+            thinking_level=types.ThinkingLevel.HIGH,
+        ),
+    ),
+    description="Collaboration Agent: Handles cross-user worldbuilding and character sharing.",
     instruction=COLLABORATION_INSTRUCTION,
     tools=[
         get_lorebook,
@@ -60,4 +73,5 @@ collaboration_agent = Agent(
         propose_crossover,
         accept_crossover,
     ],
+    on_tool_error_callback=on_tool_error,
 )

@@ -4,6 +4,8 @@ Type A endpoints: direct Firestore CRUD (no agent needed).
 Type B endpoints: agent-powered via ADK with SSE streaming.
 """
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -15,9 +17,13 @@ app = FastAPI(
     description="REST gateway for LorePack — collaborative worldbuilding & story generation.",
 )
 
+_default_origins = ["http://localhost:5173", "http://localhost:3000"]
+_extra_origins = os.environ.get("ALLOWED_ORIGINS", "").split(",")
+_all_origins = _default_origins + [o.strip() for o in _extra_origins if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=_all_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -143,6 +143,16 @@ async def stream_agent_response(
                             "thinking",
                             {"text": "Searching lorebook for relevant lore..."},
                         )
+                    elif tool_name == "get_lorebook":
+                        yield sse_event(
+                            "thinking",
+                            {"text": "Reading lorebook entries..."},
+                        )
+                    elif tool_name == "validate_lorebook_consistency":
+                        yield sse_event(
+                            "thinking",
+                            {"text": "Validating lorebook consistency..."},
+                        )
                     elif tool_name == "update_session_status":
                         yield sse_event(
                             "thinking",

@@ -109,3 +109,9 @@ variable "feedback_logs_filter" {
   default     = "jsonPayload.log_type=\"feedback\" jsonPayload.service_name=\"lorepack\""
 }
 
+variable "frontend_url" {
+  type        = string
+  description = "Frontend URL for CORS allow-origin (e.g. https://your-project.web.app)"
+  default     = ""
+}
+

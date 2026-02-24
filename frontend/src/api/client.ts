@@ -254,3 +254,7 @@ export function sendMessage(sessionId: string, text: string) {
 export function generateImage(params: GenerateImageParams) {
   return streamSSE('/images/generate', params);
 }
+
+export function enrichEntry(lorebookId: string, entryId: string, task: string) {
+  return streamSSE(`/lorebooks/${lorebookId}/entries/${entryId}/enrich`, { task });
+}

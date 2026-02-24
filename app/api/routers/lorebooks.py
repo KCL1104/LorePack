@@ -1,10 +1,11 @@
-"""Lorebook CRUD endpoints (Type A — direct Firestore)."""
+"""Lorebook endpoints (Type A: direct Firestore CRUD, Type B: agent-powered enrich via SSE)."""
 
 import json
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sse_starlette.sse import EventSourceResponse
 
 from app.api.auth import AuthUser, get_current_user
 from app.api.dependencies import get_firestore_client
@@ -233,3 +234,80 @@ async def validate_lorebook(
         raise HTTPException(status_code=404, detail=result["error"])
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Type B — Agent-powered entry enrichment via SSE
+# ---------------------------------------------------------------------------
+
+_ENRICH_PROMPTS: dict[str, str] = {
+    "backstory": (
+        "Generate a detailed backstory for the character '{name}' in lorebook {lorebook_id}. "
+        "Include their origin, 2-3 defining life events, core motivation, and internal conflict. "
+        "Ground every detail in the existing world lore. "
+        "First read the lorebook to get all context, then present the backstory for review."
+    ),
+    "expand": (
+        "Expand and enrich the lorebook entry '{name}' (category: {category}) in lorebook {lorebook_id}. "
+        "Add concrete, vivid details appropriate to its category. "
+        "First read the lorebook and search for related entries, then present the enriched content for review."
+    ),
+    "relationships": (
+        "Analyze the relationships of '{name}' with other characters in lorebook {lorebook_id}. "
+        "For each related character, describe: relationship type, how they met, current dynamic, "
+        "and potential story tension. First read the lorebook to find all character entries."
+    ),
+    "personality": (
+        "Generate a detailed personality profile for the character '{name}' in lorebook {lorebook_id}. "
+        "Include speech patterns with example dialogue, behavioral habits, emotional triggers, "
+        "how they act under pressure, and a character voice guide for writers. "
+        "First read the lorebook entry to understand the character."
+    ),
+}
+
+
+class EnrichRequest(BaseModel):
+    task: Literal["backstory", "expand", "relationships", "personality"]
+
+
+@router.post("/{lorebook_id}/entries/{entry_id}/enrich")
+async def enrich_entry(
+    lorebook_id: str,
+    entry_id: str,
+    body: EnrichRequest,
+    current_user: CurrentUser,
+):
+    """Enrich a lorebook entry with AI-generated content via SSE streaming."""
+    from app.api.sse import stream_agent_response
+
+    db = get_firestore_client()
+    _require_owned_lorebook(db, lorebook_id, current_user.uid)
+
+    entry_ref = (
+        db.collection("lorebooks")
+        .document(lorebook_id)
+        .collection("entries")
+        .document(entry_id)
+    )
+    entry_snap = entry_ref.get()
+    if not entry_snap.exists:
+        raise HTTPException(status_code=404, detail="Entry not found")
+
+    entry = entry_snap.to_dict()
+    if entry.get("owner_uid") != current_user.uid:
+        raise HTTPException(status_code=404, detail="Entry not found")
+
+    prompt_template = _ENRICH_PROMPTS[body.task]
+    prompt = prompt_template.format(
+        name=entry["name"],
+        category=entry.get("category", "other"),
+        lorebook_id=lorebook_id,
+    )
+
+    return EventSourceResponse(
+        stream_agent_response(
+            session_id=f"enrich-{lorebook_id}-{entry_id}",
+            user_message=prompt,
+            user_id=current_user.uid,
+        ),
+    )

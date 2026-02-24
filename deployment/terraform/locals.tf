@@ -27,6 +27,7 @@ locals {
   deploy_project_services = [
     "aiplatform.googleapis.com",
     "run.googleapis.com",
+    "artifactregistry.googleapis.com",
     "discoveryengine.googleapis.com",
     "cloudresourcemanager.googleapis.com",
     "iam.googleapis.com",

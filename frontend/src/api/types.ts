@@ -153,6 +153,8 @@ export interface LorebookValidation {
   status: 'passed' | 'has_warnings';
 }
 
+export type EnrichTask = 'backstory' | 'expand' | 'relationships' | 'personality';
+
 export interface SSEEvent {
   type: 'thinking' | 'text_chunk' | 'image_generated' | 'lore_cited' | 'lorebook_updated' | 'done';
   text?: string;

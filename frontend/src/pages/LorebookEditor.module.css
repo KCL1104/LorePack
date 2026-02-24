@@ -292,6 +292,87 @@
   align-items: center;
 }
 
+/* --- Enrich with AI --- */
+
+.enrichWrapper {
+  position: relative;
+}
+
+.enrichMenu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 10;
+  min-width: 260px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--gold-dim);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+
+.enrichMenuItem {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 0.6rem 0.85rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  transition: background var(--transition-fast);
+}
+
+.enrichMenuItem:hover {
+  background: var(--bg-surface);
+}
+
+.enrichMenuItem + .enrichMenuItem {
+  border-top: 1px solid rgba(139, 115, 85, 0.2);
+}
+
+.enrichMenuLabel {
+  color: var(--gold);
+  font-family: var(--font-heading);
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+}
+
+.enrichMenuDesc {
+  color: var(--ink-muted);
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+}
+
+.enrichPanel {
+  border-top: 1px solid var(--gold-dim);
+  padding-top: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.enrichStatus {
+  color: var(--gold-dim);
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-style: italic;
+}
+
+.enrichResponse {
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: var(--space-sm);
+  background: rgba(18, 18, 26, 0.6);
+  border-left: 2px solid var(--gold-dim);
+}
+
 @media (max-width: 1220px) {
   .layout {
     grid-template-columns: 1fr;

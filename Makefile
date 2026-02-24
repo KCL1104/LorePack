@@ -93,6 +93,35 @@ deploy:
 # Alias for 'make deploy' for backward compatibility
 backend: deploy
 
+# Deploy FastAPI backend to Cloud Run
+deploy-api:
+	@echo "==============================================================================="
+	@echo "| 🚀 Deploying FastAPI API to Cloud Run...                                    |"
+	@echo "==============================================================================="
+	PROJECT_ID=$$(gcloud config get-value project) && \
+	REGION=$${REGION:-asia-east1} && \
+	IMAGE="$$REGION-docker.pkg.dev/$$PROJECT_ID/lorepack-repo/lorepack-api" && \
+	gcloud builds submit --tag "$$IMAGE" --project "$$PROJECT_ID" && \
+	gcloud run deploy lorepack-api \
+		--image "$$IMAGE" \
+		--region "$$REGION" \
+		--project "$$PROJECT_ID" \
+		--allow-unauthenticated \
+		--set-env-vars "GOOGLE_CLOUD_PROJECT=$$PROJECT_ID" \
+		--set-env-vars "ALLOWED_ORIGINS=$${FRONTEND_URL:-}" \
+		--timeout 1800 \
+		--memory 1Gi \
+		--cpu 2 \
+		--min-instances 0 \
+		--max-instances 10
+
+# Deploy frontend to Firebase Hosting
+deploy-frontend:
+	@echo "==============================================================================="
+	@echo "| 🚀 Deploying frontend to Firebase Hosting...                                |"
+	@echo "==============================================================================="
+	cd frontend && npm run build && npx firebase deploy --only hosting
+
 # ==============================================================================
 # Infrastructure Setup
 # ==============================================================================

@@ -3,11 +3,13 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   createEntry,
   deleteEntry,
+  enrichEntry,
   getImage,
   listImages,
   updateEntry,
   updateLorebookMeta,
   validateLorebook,
+  type EnrichTask,
   type Entry,
   type ImageAsset,
   type LorebookValidation,
@@ -52,8 +54,17 @@ const CATEGORY_OPTIONS = [
   { value: 'location', label: 'Location' },
   { value: 'event', label: 'Event' },
   { value: 'magic_system', label: 'Magic System' },
+  { value: 'technology', label: 'Technology' },
+  { value: 'faction', label: 'Faction' },
   { value: 'item', label: 'Item' },
   { value: 'other', label: 'Other' },
+];
+
+const ENRICH_OPTIONS: { task: EnrichTask; label: string; description: string }[] = [
+  { task: 'backstory', label: 'Generate Backstory', description: 'Origin, defining events, motivation' },
+  { task: 'expand', label: 'Expand Details', description: 'Enrich with vivid, concrete details' },
+  { task: 'relationships', label: 'Map Relationships', description: 'Analyze connections to other entries' },
+  { task: 'personality', label: 'Personality Profile', description: 'Speech patterns, habits, voice guide' },
 ];
 
 const EMPTY_DRAFT: EntryDraft = {
@@ -133,6 +144,11 @@ export default function LorebookEditor() {
   const [busy, setBusy] = useState(false);
   const [validating, setValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [enriching, setEnriching] = useState(false);
+  const [enrichMenuOpen, setEnrichMenuOpen] = useState(false);
+  const [enrichStatus, setEnrichStatus] = useState('');
+  const [enrichResponse, setEnrichResponse] = useState('');
 
   const activeLorebook = useMemo(() => {
     if (!currentLorebook) return null;
@@ -281,6 +297,9 @@ export default function LorebookEditor() {
     setIsCreating(false);
     setIsEditing(false);
     setPendingDelete(false);
+    setEnrichMenuOpen(false);
+    setEnrichResponse('');
+    setEnrichStatus('');
     setSelectedEntryId(entryId);
   };
 
@@ -367,6 +386,40 @@ export default function LorebookEditor() {
       setError(err instanceof Error ? err.message : 'Validation failed.');
     } finally {
       setValidating(false);
+    }
+  };
+
+  const handleEnrich = async (task: EnrichTask) => {
+    if (!selectedLorebookId || !selectedEntryId || enriching) return;
+
+    setEnrichMenuOpen(false);
+    setEnriching(true);
+    setEnrichStatus('Summoning the World Architect...');
+    setEnrichResponse('');
+    setError(null);
+
+    try {
+      const stream = enrichEntry(selectedLorebookId, selectedEntryId, task);
+      let buffer = '';
+
+      for await (const event of stream) {
+        if (event.type === 'thinking' && event.text) {
+          setEnrichStatus(event.text);
+        }
+        if (event.type === 'text_chunk' && event.text) {
+          buffer += event.text;
+          setEnrichResponse(buffer);
+        }
+        if (event.type === 'done') {
+          setEnrichStatus('');
+          await refreshSelectedLorebook();
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Enrichment failed.');
+      setEnrichStatus('');
+    } finally {
+      setEnriching(false);
     }
   };
 
@@ -709,6 +762,32 @@ export default function LorebookEditor() {
                         Edit
                       </Button>
 
+                      <div className={styles.enrichWrapper}>
+                        <Button
+                          variant="ghost"
+                          onClick={() => setEnrichMenuOpen((prev) => !prev)}
+                          disabled={!selectedEntry || busy || enriching}
+                        >
+                          {enriching ? 'Enriching...' : '✦ Enrich with AI'}
+                        </Button>
+
+                        {enrichMenuOpen ? (
+                          <div className={styles.enrichMenu}>
+                            {ENRICH_OPTIONS.map((option) => (
+                              <button
+                                key={option.task}
+                                type="button"
+                                className={styles.enrichMenuItem}
+                                onClick={() => handleEnrich(option.task)}
+                              >
+                                <span className={styles.enrichMenuLabel}>{option.label}</span>
+                                <span className={styles.enrichMenuDesc}>{option.description}</span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+
                       {!pendingDelete ? (
                         <Button
                           variant="ghost"
@@ -730,6 +809,17 @@ export default function LorebookEditor() {
                     </>
                   )}
                 </div>
+
+                {enrichStatus || enrichResponse ? (
+                  <div className={styles.enrichPanel}>
+                    {enrichStatus ? (
+                      <p className={styles.enrichStatus}>{enrichStatus}</p>
+                    ) : null}
+                    {enrichResponse ? (
+                      <div className={styles.enrichResponse}>{enrichResponse}</div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             )}
           </Card>

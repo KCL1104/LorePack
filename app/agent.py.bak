@@ -11,13 +11,6 @@ from google.adk.models import Gemini
 from google.adk.tools import LongRunningFunctionTool
 from google.genai import types
 
-from app.agents._callbacks import on_model_error as _on_model_error
-from app.agents._callbacks import on_tool_error as _on_tool_error
-from app.agents.collaboration import collaboration_agent
-from app.agents.narrative_director import narrative_director_agent
-from app.agents.visual_artist import visual_artist_agent
-from app.agents.world_architect import world_architect_agent
-
 _logger = logging.getLogger("lorepack.agent")
 
 
@@ -32,6 +25,35 @@ async def _log_agent_call(callback_context):
     except Exception:
         pass  # never break agent flow due to logging
     return None
+
+
+def _on_model_error(callback_context, error):
+    """on_model_error_callback: log LLM errors and let ADK retry."""
+    _logger.error(
+        "[ADK] model_error agent=%s error=%s",
+        getattr(callback_context, "agent_name", "?"),
+        error,
+    )
+    return None  # let ADK handle the retry via HttpRetryOptions
+
+
+def _on_tool_error(callback_context, tool, args, error):
+    """on_tool_error_callback: log tool errors and return a graceful message."""
+    tool_name = getattr(tool, "name", str(tool))
+    _logger.error(
+        "[ADK] tool_error agent=%s tool=%s args=%s error=%s",
+        getattr(callback_context, "agent_name", "?"),
+        tool_name,
+        args,
+        error,
+    )
+    # Return an error dict so the agent can inform the user instead of crashing
+    return {"error": f"Tool '{tool_name}' failed: {error}. Please try again."}
+
+from app.agents.collaboration import collaboration_agent
+from app.agents.narrative_director import narrative_director_agent
+from app.agents.visual_artist import visual_artist_agent
+from app.agents.world_architect import world_architect_agent
 
 _, project_id = google.auth.default()
 os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
@@ -89,11 +111,6 @@ protagonist_archetype, protagonist_virtues, protagonist_shadow, spark), dispatch
 The frontend has a dedicated "Approve World & Begin First Chapter" step.
 Do NOT instruct the narrative_director to skip this review — it is a required part of the flow.
 
-## Language Handling
-Detect the user's language from their first message. Before dispatching to a sub-agent, prepend
-"Response language: [detected language]" (e.g. "Response language: zh-TW", "Response language: en")
-to the beginning of the user's message context. If the language is ambiguous, default to English.
-
 ## Dispatch Rules
 - Analyze the user's intent and dispatch to the single most appropriate sub-agent.
 - If a task spans multiple agents, dispatch sequentially in logical order. Examples:
@@ -101,18 +118,14 @@ to the beginning of the user's message context. If the language is ambiguous, de
   - "Start a new story and draw the main character" → narrative_director first, then visual_artist.
 - If the intent is unclear, use the request_user_input tool to ask the user for clarification.
 - Do NOT add your own commentary after a sub-agent responds — relay the sub-agent's response directly.
+- Always respond to the user in their preferred language.
 """
 
 root_agent = Agent(
     name="root_agent",
     model=Gemini(
-        model="gemini-3-flash-preview",
+        model="gemini-3.1-pro-preview",
         retry_options=types.HttpRetryOptions(attempts=3),
-    ),
-    generate_content_config=types.GenerateContentConfig(
-        thinking_config=types.ThinkingConfig(
-            thinking_level=types.ThinkingLevel.MINIMAL,
-        ),
     ),
     description="Root orchestrator for the LorePack collaborative worldbuilding and story generation platform.",
     instruction=ROOT_AGENT_INSTRUCTION,

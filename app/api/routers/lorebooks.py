@@ -51,19 +51,13 @@ async def list_lorebooks(current_user: CurrentUser):
     summaries = []
     for lb_snap in col.where("owner_uid", "==", current_user.uid).stream():
         lb = lb_snap.to_dict()
-        lb_id = lb["id"]
-        entry_count = sum(
-            1
-            for entry in col.document(lb_id).collection("entries").stream()
-            if entry.to_dict().get("owner_uid") == current_user.uid
-        )
         summaries.append(
             {
-                "id": lb_id,
+                "id": lb["id"],
                 "title": lb["title"],
                 "genre": lb.get("genre", ""),
                 "description": lb.get("description", ""),
-                "entry_count": entry_count,
+                "entry_count": lb.get("entry_count", 0),
                 "updated_at": lb.get("updated_at", ""),
             }
         )
@@ -223,6 +217,14 @@ async def delete_entry(
         raise HTTPException(status_code=404, detail="Entry not found")
 
     entry_ref.delete()
+
+    from datetime import UTC, datetime
+
+    from google.cloud.firestore_v1 import Increment
+
+    db.collection("lorebooks").document(lorebook_id).update(
+        {"updated_at": datetime.now(UTC).isoformat(), "entry_count": Increment(-1)}
+    )
 
 
 @router.post("/{lorebook_id}/validate")

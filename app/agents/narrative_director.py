@@ -6,6 +6,7 @@ from google.adk.models import Gemini
 from google.genai import types
 
 from app.agents._callbacks import on_tool_error as _on_tool_error
+from app.tools.image_tools import generate_character_image, generate_scene_image
 from app.tools.lorebook_tools import add_lorebook_entry, get_lorebook
 from app.tools.rag_tools import search_lore
 from app.tools.session_tools import get_session, update_session_status
@@ -57,6 +58,10 @@ When you receive a conjure prompt structured as Step 1 (Genre) → Step 2 (World
    - Whether they want to adjust anything (characters, locations, lore)
    - Or approve the world and begin the first chapter
    **Do NOT generate a chapter until the user explicitly approves the world.** The frontend has a dedicated approval step; generating a chapter prematurely will break the flow.
+8. **Auto-generate key visuals**: After presenting the world, generate images for the most important entities:
+   - Call `generate_character_image` for the protagonist. Use their appearance details from the lorebook entry you just created as `appearance_description`. Set `lorebook_id` to the lorebook ID from the conjure prompt.
+   - Call `generate_scene_image` for each key location (2-3 locations). Use the location's description as `scene_description`. Set `lorebook_id` accordingly.
+   - This happens BEFORE the user approves — so the Gallery is populated by the time they review the world.
 
 ## Story Preferences
 The conjure prompt and subsequent messages include a "Story Preferences" block with:
@@ -145,6 +150,8 @@ narrative_director_agent = Agent(
         get_story_chapters,
         get_session,
         update_session_status,
+        generate_character_image,
+        generate_scene_image,
     ],
     on_tool_error_callback=_on_tool_error,
 )

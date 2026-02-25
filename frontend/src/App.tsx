@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { AppLayout } from './components/layout';
+import { ErrorBoundary } from './components/ui';
 import AuthPage from './pages/Auth';
 import Dashboard from './pages/Dashboard';
 import StoryStudio from './pages/StoryStudio';
@@ -20,6 +21,7 @@ export default function App() {
   }, [initializeAuth]);
 
   return (
+    <ErrorBoundary>
     <BrowserRouter>
       <Routes>
         <Route path="/auth" element={<AuthPage />} />
@@ -37,5 +39,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
+    </ErrorBoundary>
   );
 }

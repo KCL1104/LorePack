@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router';
 
 import {
   createEntry,
   deleteEntry,
   enrichEntry,
+  generateImage,
   getImage,
   listImages,
   updateEntry,
@@ -118,10 +120,12 @@ function parseTags(tagsText: string): string[] {
 }
 
 export default function LorebookEditor() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const lorebooks = useAppStore((state) => state.lorebooks);
   const currentLorebook = useAppStore((state) => state.currentLorebook);
   const fetchLorebooks = useAppStore((state) => state.fetchLorebooks);
   const fetchLorebook = useAppStore((state) => state.fetchLorebook);
+  const addToast = useAppStore((state) => state.addToast);
 
   const [selectedLorebookId, setSelectedLorebookId] = useState('');
   const [selectedEntryId, setSelectedEntryId] = useState('');
@@ -149,6 +153,7 @@ export default function LorebookEditor() {
   const [enrichMenuOpen, setEnrichMenuOpen] = useState(false);
   const [enrichStatus, setEnrichStatus] = useState('');
   const [enrichResponse, setEnrichResponse] = useState('');
+  const [generatingImage, setGeneratingImage] = useState(false);
 
   const activeLorebook = useMemo(() => {
     if (!currentLorebook) return null;
@@ -204,10 +209,18 @@ export default function LorebookEditor() {
       return;
     }
 
+    // Support ?id=<lorebookId> from Dashboard navigation
+    const queryId = searchParams.get('id');
+    if (queryId && lorebooks.some((item) => item.id === queryId)) {
+      setSelectedLorebookId(queryId);
+      setSearchParams({}, { replace: true });
+      return;
+    }
+
     if (!selectedLorebookId || !lorebooks.some((item) => item.id === selectedLorebookId)) {
       setSelectedLorebookId(lorebooks[0].id);
     }
-  }, [lorebooks, selectedLorebookId]);
+  }, [lorebooks, selectedLorebookId, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!selectedLorebookId) return;
@@ -760,6 +773,35 @@ export default function LorebookEditor() {
                     <>
                       <Button onClick={() => setIsEditing(true)} disabled={!selectedEntry || busy}>
                         Edit
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        onClick={async () => {
+                          if (!selectedEntry || !selectedLorebookId || generatingImage) return;
+                          setGeneratingImage(true);
+                          try {
+                            const cat = normalizeCategory(selectedEntry.category);
+                            const imageType = ['character', 'characters'].includes(cat) ? 'character' : 'scene';
+                            for await (const event of generateImage({
+                              lorebook_id: selectedLorebookId,
+                              entry_name: selectedEntry.name,
+                              image_type: imageType,
+                            })) {
+                              if (event.type === 'done') break;
+                            }
+                            addToast({ variant: 'success', message: `Image generated for ${selectedEntry.name}` });
+                            const freshAssets = await listImages({ asset_type: 'character' });
+                            setPortraitAssets(freshAssets);
+                          } catch (err) {
+                            addToast({ variant: 'error', message: err instanceof Error ? err.message : 'Image generation failed.' });
+                          } finally {
+                            setGeneratingImage(false);
+                          }
+                        }}
+                        disabled={!selectedEntry || busy || generatingImage}
+                      >
+                        {generatingImage ? 'Generating...' : 'Generate Image'}
                       </Button>
 
                       <div className={styles.enrichWrapper}>

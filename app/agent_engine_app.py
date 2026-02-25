@@ -91,7 +91,14 @@ def _build_agent_card() -> AgentCard:
                     "Uses Gemini interleaved output for inline scene illustrations. "
                     "Supports configurable chapter length and writing style."
                 ),
-                tags=["story", "chapter", "generation", "illustration", "RAG", "narrative"],
+                tags=[
+                    "story",
+                    "chapter",
+                    "generation",
+                    "illustration",
+                    "RAG",
+                    "narrative",
+                ],
                 examples=[
                     "Conjure a dark fantasy world with a warrior protagonist",
                     "Generate Chapter 2 of the ongoing story",

@@ -4,14 +4,12 @@ Provides REST endpoints for managing and interacting with lorebook agents,
 plus path-based A2A routes for per-agent discovery and JSON-RPC.
 """
 
-import asyncio
 import json
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from starlette.responses import Response
 
 from app.a2a.registry import get_registry
 from app.api.auth import AuthUser, get_current_user
@@ -56,7 +54,9 @@ async def discover_remote_agent(body: DiscoverRequest, current_user: CurrentUser
         card = await discover_agent(body.url)
         return card.model_dump(exclude_none=True, by_alias=True)
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Failed to discover agent: {e}") from e
+        raise HTTPException(
+            status_code=502, detail=f"Failed to discover agent: {e}"
+        ) from e
 
 
 class InteractRequest(BaseModel):
@@ -73,7 +73,9 @@ async def interact_with_agent(body: InteractRequest, current_user: CurrentUser):
         result = await send_to_remote_agent(body.agent_url, body.message)
         return json.loads(result)
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"A2A interaction failed: {e}") from e
+        raise HTTPException(
+            status_code=502, detail=f"A2A interaction failed: {e}"
+        ) from e
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +100,6 @@ async def agent_jsonrpc(agent_id: str, request: Request):
     Delegates to the agent's own DefaultRequestHandler which processes
     message/send, tasks/get, etc.
     """
-    from a2a.server.apps.jsonrpc.jsonrpc_app import DefaultCallContextBuilder
 
     registry = get_registry()
     agent = registry.get_agent(agent_id)
@@ -106,8 +107,7 @@ async def agent_jsonrpc(agent_id: str, request: Request):
         raise HTTPException(status_code=404, detail=f"Agent '{agent_id}' not found")
 
     # Build a minimal JSONRPC handler and process the request
-    from a2a.server.request_handlers.jsonrpc_handler import JSONRPCHandler
-    from a2a.types import A2ARequest, JSONRPCRequest, SendMessageRequest
+    from a2a.types import JSONRPCRequest, SendMessageRequest
 
     try:
         body = await request.json()
@@ -116,11 +116,11 @@ async def agent_jsonrpc(agent_id: str, request: Request):
         # Only support message/send for now
         if base_request.method == "message/send":
             specific = SendMessageRequest.model_validate(body)
-            result = await agent.request_handler.on_message_send(
-                specific.params
-            )
+            result = await agent.request_handler.on_message_send(specific.params)
             # Serialize response
-            from a2a.server.request_handlers.response_helpers import prepare_response_object
+            from a2a.server.request_handlers.response_helpers import (
+                prepare_response_object,
+            )
             from a2a.types import (
                 Message,
                 SendMessageResponse,
@@ -129,19 +129,30 @@ async def agent_jsonrpc(agent_id: str, request: Request):
             )
 
             response_obj = prepare_response_object(
-                specific.id, result, (Task, Message),
-                SendMessageSuccessResponse, SendMessageResponse,
+                specific.id,
+                result,
+                (Task, Message),
+                SendMessageSuccessResponse,
+                SendMessageResponse,
             )
             return JSONResponse(
                 response_obj.root.model_dump(mode="json", exclude_none=True)
             )
 
         return JSONResponse(
-            {"jsonrpc": "2.0", "error": {"code": -32601, "message": "Method not found"}, "id": body.get("id")},
+            {
+                "jsonrpc": "2.0",
+                "error": {"code": -32601, "message": "Method not found"},
+                "id": body.get("id"),
+            },
             status_code=200,
         )
     except Exception as e:
         return JSONResponse(
-            {"jsonrpc": "2.0", "error": {"code": -32603, "message": str(e)}, "id": None},
+            {
+                "jsonrpc": "2.0",
+                "error": {"code": -32603, "message": str(e)},
+                "id": None,
+            },
             status_code=200,
         )

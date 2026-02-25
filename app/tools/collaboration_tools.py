@@ -60,7 +60,11 @@ def export_lorebook(lorebook_id: str, requester_uid: str = "") -> str:
             entry.pop("embedding", None)
             public_entries.append(entry)
 
-    if resolved_requester_uid and source_owner_uid != resolved_requester_uid and not public_entries:
+    if (
+        resolved_requester_uid
+        and source_owner_uid != resolved_requester_uid
+        and not public_entries
+    ):
         return json.dumps(
             {"error": f"Lorebook {lorebook_id} has no public entries"},
             ensure_ascii=False,
@@ -223,9 +227,7 @@ def propose_crossover(
         and target_owner_uid != resolved_requester_uid
     ):
         return json.dumps(
-            {
-                "error": "Not authorized to create a proposal between these lorebooks"
-            },
+            {"error": "Not authorized to create a proposal between these lorebooks"},
             ensure_ascii=False,
         )
 

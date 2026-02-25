@@ -139,6 +139,84 @@
   gap: var(--space-sm);
 }
 
+.guideCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.guideTitle {
+  font-family: var(--font-heading);
+  color: var(--gold);
+  font-size: 1.28rem;
+  letter-spacing: 0.04em;
+}
+
+.guideSubtitle {
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.guideSteps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md);
+}
+
+.guideStep {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  border: 1px solid rgba(139, 115, 85, 0.25);
+  border-radius: 2px;
+  background: rgba(196, 162, 101, 0.04);
+}
+
+.guideIcon {
+  color: var(--gold);
+  font-size: 1.5rem;
+  line-height: 1;
+  margin-bottom: var(--space-xs);
+}
+
+.guideStepTitle {
+  font-family: var(--font-heading);
+  color: var(--gold-dim);
+  font-size: 0.88rem;
+  letter-spacing: 0.08em;
+}
+
+.guideStepDesc {
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  flex: 1;
+}
+
+.guideLink {
+  color: var(--gold);
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  text-decoration: none;
+  letter-spacing: 0.06em;
+  margin-top: var(--space-xs);
+  transition: color var(--transition-fast);
+}
+
+.guideLink:hover {
+  color: var(--gold-bright);
+}
+
+@media (max-width: 860px) {
+  .guideSteps {
+    grid-template-columns: 1fr;
+  }
+}
+
 .mutedText {
   color: var(--ink-muted);
   font-family: var(--font-ui);

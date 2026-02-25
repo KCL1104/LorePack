@@ -10,7 +10,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.a2a.server import mount_a2a_server
-from app.api.routers import a2a_registry, collaboration, gallery, images, lorebooks, sessions
+from app.api.routers import (
+    a2a_registry,
+    collaboration,
+    gallery,
+    images,
+    lorebooks,
+    sessions,
+)
 
 app = FastAPI(
     title="LorePack API",

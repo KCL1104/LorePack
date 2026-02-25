@@ -321,10 +321,46 @@ export default function Gallery() {
           <p>Opening the gallery vault...</p>
         </Card>
       ) : filteredImages.length === 0 ? (
-        <Card hoverable={false} className={styles.emptyCard}>
-          <p>No visions match this filter.</p>
-          <p className={styles.mutedText}>Generate more art from Story Studio to populate this gallery.</p>
-        </Card>
+        images.length === 0 ? (
+          <Card hoverable={false} className={styles.guideCard}>
+            <h2 className={styles.guideTitle}>Your gallery is empty — let's fill it with visions</h2>
+            <p className={styles.guideSubtitle}>
+              Images are generated automatically or on demand. Here are 3 ways to populate your gallery:
+            </p>
+            <div className={styles.guideSteps}>
+              <div className={styles.guideStep}>
+                <span className={styles.guideIcon}>✦</span>
+                <h3 className={styles.guideStepTitle}>1. Conjure a New Story</h3>
+                <p className={styles.guideStepDesc}>
+                  Start a tale in <strong>Story Studio</strong>. Character portraits and scene images are generated automatically during world creation.
+                </p>
+                <Link to="/story-studio" className={styles.guideLink}>Open Story Studio →</Link>
+              </div>
+              <div className={styles.guideStep}>
+                <span className={styles.guideIcon}>◈</span>
+                <h3 className={styles.guideStepTitle}>2. Generate from Lorebook</h3>
+                <p className={styles.guideStepDesc}>
+                  Open the <strong>Lorebook Editor</strong> and click &quot;Generate Image&quot; on any character, location, or event entry.
+                </p>
+                <Link to="/lorebook" className={styles.guideLink}>Open Lorebook Editor →</Link>
+              </div>
+              <div className={styles.guideStep}>
+                <span className={styles.guideIcon}>↻</span>
+                <h3 className={styles.guideStepTitle}>3. Regenerate in Gallery</h3>
+                <p className={styles.guideStepDesc}>
+                  Once you have images, open any vision in the lightbox and click &quot;Regenerate&quot; for a fresh interpretation.
+                </p>
+              </div>
+            </div>
+          </Card>
+        ) : (
+          <Card hoverable={false} className={styles.emptyCard}>
+            <p>No visions match this filter.</p>
+            <p className={styles.mutedText}>
+              Try selecting &quot;All&quot; or a different lorebook. You have {images.length} total vision{images.length !== 1 ? 's' : ''} in the gallery.
+            </p>
+          </Card>
+        )
       ) : (
         <>
           {heroImage ? (

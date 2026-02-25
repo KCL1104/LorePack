@@ -105,6 +105,9 @@ export const useAppStore = create<AppState>((set) => ({
   addToast: (toast) => {
     const id = String(++toastId);
     set((state) => ({ toasts: [...state.toasts, { ...toast, id }] }));
+    setTimeout(() => {
+      set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }));
+    }, 5000);
   },
 
   removeToast: (id) => {

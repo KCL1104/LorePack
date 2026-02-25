@@ -62,9 +62,11 @@ async def get_image(image_id: str, current_user: CurrentUser):
     signed_url = None
     gs_uri = data.get("gs_uri", "")
     if gs_uri:
+        import asyncio
+
         from app.tools.gcs_tools import get_signed_url
 
-        signed_url = get_signed_url(gs_uri)
+        signed_url = await asyncio.to_thread(get_signed_url, gs_uri)
 
     return {
         "id": doc.id,

@@ -4,14 +4,13 @@
 
 import json
 import os
+import time
 from datetime import UTC, datetime
 
 from google.genai import types
 
 from app.tools.user_context import resolve_owner_uid
 
-_cached_genai = None
-_cached_col = None
 _IMAGE_MODEL = "imagen-4.0-fast-generate-001"
 
 
@@ -44,29 +43,15 @@ def _image_config() -> types.GenerateImagesConfig:
 
 
 def _get_genai_client():
-    """Lazy singleton for genai client."""
-    global _cached_genai
-    if _cached_genai is None:
-        import google.auth
-        from google import genai
+    from app.tools._firestore import get_imagen_client
 
-        _, project = google.auth.default()
-        _cached_genai = genai.Client(
-            vertexai=True,
-            project=project,
-            location=os.environ.get("IMAGEN_LOCATION", "us-central1"),
-        )
-    return _cached_genai
+    return get_imagen_client()
 
 
 def _get_image_assets_col():
-    """Lazy singleton for Firestore collection."""
-    global _cached_col
-    if _cached_col is None:
-        from google.cloud import firestore
+    from app.tools._firestore import get_db
 
-        _cached_col = firestore.Client().collection("image_assets")
-    return _cached_col
+    return get_db().collection("image_assets")
 
 
 def generate_character_image(
@@ -95,7 +80,10 @@ def generate_character_image(
     _quality_suffix = "high quality, detailed, no text, no watermark, no signature, no extra fingers, no deformed hands"
     prompt = f"{art_style}, {pose} of {character_name}: {appearance_description}. {_quality_suffix}"
     safe_name = character_name.lower().replace(" ", "_")
-    gcs_path = f"characters/{safe_name}.png"
+    ts_hex = hex(int(time.time() * 1000))[-8:]
+    gcs_path = (
+        f"characters/{resolved_owner_uid}/{lorebook_id or '_'}/{safe_name}_{ts_hex}.png"
+    )
 
     client = _get_genai_client()
     response = client.models.generate_images(
@@ -151,7 +139,10 @@ def generate_scene_image(
     _quality_suffix = "high quality, detailed, no text, no watermark, no signature"
     prompt = f"{art_style}, {mood} mood: {scene_description}. {_quality_suffix}"
     safe_name = scene_name.lower().replace(" ", "_")
-    gcs_path = f"scenes/{safe_name}.png"
+    ts_hex = hex(int(time.time() * 1000))[-8:]
+    gcs_path = (
+        f"scenes/{resolved_owner_uid}/{lorebook_id or '_'}/{safe_name}_{ts_hex}.png"
+    )
 
     client = _get_genai_client()
     response = client.models.generate_images(

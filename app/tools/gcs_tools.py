@@ -2,11 +2,12 @@
 # Upload, signed URL generation, and asset listing for the lorepack-assets bucket
 
 import json
+import os
 from datetime import timedelta
 
 from google.cloud import storage
 
-_BUCKET_NAME = "lorepack-assets-gemini-hack"
+_BUCKET_NAME = os.environ.get("LOREPACK_GCS_BUCKET", "lorepack-assets-gemini-hack")
 
 
 def _get_bucket():

@@ -4,48 +4,39 @@
 
 import json
 import math
+from collections import OrderedDict
 
 from app.tools.user_context import resolve_owner_uid
 
 _EMBED_MODEL = "text-embedding-004"
-_cached_genai_client = None
-_cached_lorebooks_col = None
-_embedding_cache: dict[str, list[float]] = {}
+_MAX_EMBEDDING_CACHE = 500
+_embedding_cache: OrderedDict[str, list[float]] = OrderedDict()
 
 
 def _get_lorebooks_col():
-    """Lazy singleton for Firestore collection."""
-    global _cached_lorebooks_col
-    if _cached_lorebooks_col is None:
-        from google.cloud import firestore
+    from app.tools._firestore import get_db
 
-        _cached_lorebooks_col = firestore.Client().collection("lorebooks")
-    return _cached_lorebooks_col
+    return get_db().collection("lorebooks")
 
 
 def _get_genai_client():
-    """Lazy singleton for genai client."""
-    global _cached_genai_client
-    if _cached_genai_client is None:
-        from google import genai
-        from google.cloud import firestore
+    from app.tools._firestore import get_genai_client
 
-        db = firestore.Client()
-        _cached_genai_client = genai.Client(
-            vertexai=True, project=db.project, location="global"
-        )
-    return _cached_genai_client
+    return get_genai_client()
 
 
 def _compute_embedding(text: str) -> list[float]:
     """Compute embedding vector for a text string."""
     cached = _embedding_cache.get(text)
     if cached is not None:
+        _embedding_cache.move_to_end(text)  # mark as recently used
         return cached
 
     result = _get_genai_client().models.embed_content(model=_EMBED_MODEL, contents=text)
     embedding = list(result.embeddings[0].values)
     _embedding_cache[text] = embedding
+    if len(_embedding_cache) > _MAX_EMBEDDING_CACHE:
+        _embedding_cache.popitem(last=False)  # evict oldest
     return embedding
 
 

@@ -3,7 +3,7 @@ name = "lorepack"
 version = "0.1.0"
 description = ""
 authors = [
-    {name = "Your Name", email = "your@email.com"},
+    {name = "LorePack Team"},
 ]
 dependencies = [
     "google-adk>=1.16.0,<2.0.0",

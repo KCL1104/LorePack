@@ -4,7 +4,6 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from a2a.types import AgentCapabilities, AgentCard, AgentSkill, TransportProtocol
 
 
@@ -37,7 +36,9 @@ class TestDiscoverAgent:
     @pytest.mark.asyncio
     @patch("app.a2a.client.A2ACardResolver")
     @patch("app.a2a.client.httpx.AsyncClient")
-    async def test_returns_agent_card(self, mock_http_cls, mock_resolver_cls, sample_agent_card):
+    async def test_returns_agent_card(
+        self, mock_http_cls, mock_resolver_cls, sample_agent_card
+    ):
         """discover_agent should resolve and return a remote AgentCard."""
         mock_resolver = MagicMock()
         mock_resolver.get_agent_card = AsyncMock(return_value=sample_agent_card)
@@ -57,7 +58,9 @@ class TestDiscoverAgent:
     @pytest.mark.asyncio
     @patch("app.a2a.client.A2ACardResolver")
     @patch("app.a2a.client.httpx.AsyncClient")
-    async def test_resolver_called_with_base_url(self, mock_http_cls, mock_resolver_cls, sample_agent_card):
+    async def test_resolver_called_with_base_url(
+        self, mock_http_cls, mock_resolver_cls, sample_agent_card
+    ):
         """discover_agent should pass the base URL to the resolver."""
         mock_resolver = MagicMock()
         mock_resolver.get_agent_card = AsyncMock(return_value=sample_agent_card)
@@ -86,9 +89,7 @@ class TestSendToRemoteAgent:
         """send_to_remote_agent should return JSON with status and response."""
         from a2a.types import (
             Artifact,
-            Message,
             Part,
-            Role,
             Task,
             TaskState,
             TaskStatus,

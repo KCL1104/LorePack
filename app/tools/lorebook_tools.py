@@ -8,17 +8,11 @@ from datetime import UTC, datetime
 
 from app.tools.user_context import resolve_owner_uid
 
-_cached_col = None
-
 
 def _get_lorebooks_col():
-    """Lazy singleton for Firestore collection."""
-    global _cached_col
-    if _cached_col is None:
-        from google.cloud import firestore
+    from app.tools._firestore import get_db
 
-        _cached_col = firestore.Client().collection("lorebooks")
-    return _cached_col
+    return get_db().collection("lorebooks")
 
 
 def create_lorebook(
@@ -37,7 +31,7 @@ def create_lorebook(
     Returns:
         JSON string containing the new lorebook's ID and details.
     """
-    lorebook_id = str(uuid.uuid4())[:8]
+    lorebook_id = str(uuid.uuid4())[:12]
     resolved_owner_uid = resolve_owner_uid(owner_uid)
     now = datetime.now(UTC).isoformat()
     lorebook = {
@@ -46,6 +40,7 @@ def create_lorebook(
         "genre": genre,
         "description": description,
         "owner_uid": resolved_owner_uid,
+        "entry_count": 0,
         "created_at": now,
         "updated_at": now,
     }
@@ -91,7 +86,7 @@ def add_lorebook_entry(
             {"error": f"Lorebook {lorebook_id} not found"}, ensure_ascii=False
         )
 
-    entry_id = str(uuid.uuid4())[:8]
+    entry_id = str(uuid.uuid4())[:12]
     now = datetime.now(UTC).isoformat()
     entry = {
         "id": entry_id,
@@ -104,7 +99,10 @@ def add_lorebook_entry(
         "created_at": now,
     }
     lb_ref.collection("entries").document(entry_id).set(entry)
-    lb_ref.update({"updated_at": now})
+
+    from google.cloud.firestore_v1 import Increment
+
+    lb_ref.update({"updated_at": now, "entry_count": Increment(1)})
 
     # Compute and store embedding for semantic search
     from app.tools.rag_tools import embed_and_store_entry
@@ -162,17 +160,12 @@ def list_lorebooks(owner_uid: str = "") -> str:
         lb = lb_snap.to_dict()
         if lb.get("owner_uid") != resolved_owner_uid:
             continue
-        entry_count = sum(
-            1
-            for entry in col.document(lb["id"]).collection("entries").stream()
-            if entry.to_dict().get("owner_uid") == resolved_owner_uid
-        )
         summaries.append(
             {
                 "id": lb["id"],
                 "title": lb["title"],
                 "genre": lb["genre"],
-                "entry_count": entry_count,
+                "entry_count": lb.get("entry_count", 0),
                 "updated_at": lb.get("updated_at", ""),
             }
         )

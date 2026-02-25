@@ -299,21 +299,23 @@ export default function Dashboard() {
                 </Card>
               ) : (
                 activeSessions.map((session) => (
-                  <Card key={session.id} className={styles.taleCard} data-dashboard-card>
-                    <div className={styles.cardHeader}>
-                      <Tag label={formatLabel(session.genre)} selected />
-                      <Tag label={formatLabel(session.status)} />
-                    </div>
-                    <h3 className={styles.cardTitle}>{formatLabel(session.world_era)} Chronicle</h3>
-                    <p className={styles.mutedText}>Lorebook {session.lorebook_id}</p>
-                    <p className={styles.metaText}>Last edited {formatDate(session.updated_at)}</p>
-                    <div className={styles.progressTrack}>
-                      <div
-                        className={styles.progressFill}
-                        style={{ width: `${getStatusProgress(session.status)}%` }}
-                      />
-                    </div>
-                  </Card>
+                  <Link key={session.id} to={`/story-studio?session=${session.id}`} className={styles.cardLink}>
+                    <Card className={styles.taleCard} data-dashboard-card>
+                      <div className={styles.cardHeader}>
+                        <Tag label={formatLabel(session.genre)} selected />
+                        <Tag label={formatLabel(session.status)} />
+                      </div>
+                      <h3 className={styles.cardTitle}>{formatLabel(session.genre)} · {formatLabel(session.world_era)}</h3>
+                      <p className={styles.mutedText}>Lorebook {session.lorebook_id}</p>
+                      <p className={styles.metaText}>Last edited {formatDate(session.updated_at)}</p>
+                      <div className={styles.progressTrack}>
+                        <div
+                          className={styles.progressFill}
+                          style={{ width: `${getStatusProgress(session.status)}%` }}
+                        />
+                      </div>
+                    </Card>
+                  </Link>
                 ))
               )}
             </div>
@@ -328,14 +330,16 @@ export default function Dashboard() {
 
             <div className={styles.gridThree}>
               {visibleLorebooks.map((lorebook) => (
-                <Card key={lorebook.id} className={styles.lorebookCard} data-dashboard-card>
-                  <div className={styles.cardHeader}>
-                    <Tag label={formatLabel(lorebook.genre)} />
-                  </div>
-                  <h3 className={styles.cardTitle}>{lorebook.title}</h3>
-                  <p className={styles.mutedText}>{lorebook.description || 'No description yet.'}</p>
-                  <p className={styles.metaText}>{lorebook.entry_count} entries recorded</p>
-                </Card>
+                <Link key={lorebook.id} to={`/lorebook?id=${lorebook.id}`} className={styles.cardLink}>
+                  <Card className={styles.lorebookCard} data-dashboard-card>
+                    <div className={styles.cardHeader}>
+                      <Tag label={formatLabel(lorebook.genre)} />
+                    </div>
+                    <h3 className={styles.cardTitle}>{lorebook.title}</h3>
+                    <p className={styles.mutedText}>{lorebook.description || 'No description yet.'}</p>
+                    <p className={styles.metaText}>{lorebook.entry_count} entries recorded</p>
+                  </Card>
+                </Link>
               ))}
 
               <Link to="/lorebook" className={styles.newLorebookLink}>

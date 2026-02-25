@@ -15,7 +15,6 @@ from a2a.client.client_factory import ClientFactory
 from a2a.types import (
     AgentCard,
     Message,
-    MessageSendParams,
     Part,
     Role,
     Task,

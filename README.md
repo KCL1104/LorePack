@@ -196,6 +196,13 @@ See the [deployment guide](https://googlecloudplatform.github.io/agent-starter-p
 
 ---
 
+## Known Limitations
+
+- **In-memory sessions** — The local dev server uses `InMemorySessionService` from Google ADK, meaning all active story sessions are lost on server restart. For production, swap to a persistent session backend (e.g. Firestore-backed `DatabaseSessionService`).
+- **Imagen availability** — Image generation requires Vertex AI Imagen API access. If your project hasn't enabled the API or lacks quota, image features will fail gracefully.
+
+---
+
 ## License
 
 Apache 2.0

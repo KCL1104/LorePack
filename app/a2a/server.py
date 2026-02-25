@@ -141,6 +141,4 @@ def mount_a2a_server(app: FastAPI) -> None:
 
     a2a_app.add_routes_to_app(app)
 
-    logger.info(
-        "A2A server mounted: /.well-known/agent-card.json + JSON-RPC POST /"
-    )
+    logger.info("A2A server mounted: /.well-known/agent-card.json + JSON-RPC POST /")

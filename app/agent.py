@@ -28,10 +28,13 @@ async def _log_agent_call(callback_context):
     """
     try:
         inv_id = getattr(callback_context, "invocation_id", "?")
-        _logger.info("[ADK] agent=%s invocation=%s", callback_context.agent_name, inv_id)
+        _logger.info(
+            "[ADK] agent=%s invocation=%s", callback_context.agent_name, inv_id
+        )
     except Exception:
         pass  # never break agent flow due to logging
     return None
+
 
 _, project_id = google.auth.default()
 os.environ["GOOGLE_CLOUD_PROJECT"] = project_id

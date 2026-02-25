@@ -4,6 +4,7 @@ Handles both text and interleaved image data from Gemini's mixed output.
 """
 
 import json
+import logging
 from collections.abc import AsyncGenerator
 
 from google.adk.artifacts import InMemoryArtifactService
@@ -12,6 +13,8 @@ from google.adk.sessions import InMemorySessionService
 from google.genai import types as genai_types
 
 from app.tools.user_context import scoped_user
+
+_logger = logging.getLogger("lorepack.sse")
 
 
 def sse_event(event_type: str, data: dict) -> str:
@@ -87,110 +90,172 @@ async def stream_agent_response(
         )
 
         full_text = ""
-        async for event in runner.run_async(
-            session_id=session.id,
-            user_id=user_id,
-            new_message=content,
-        ):
-            if not event.content or not event.content.parts:
-                continue
+        try:
+            async for event in runner.run_async(
+                session_id=session.id,
+                user_id=user_id,
+                new_message=content,
+            ):
+                if not event.content or not event.content.parts:
+                    continue
 
-            for part in event.content.parts:
-                # --- Text ---
-                if part.text:
-                    full_text += part.text
-                    yield sse_event("text_chunk", {"text": part.text})
+                for part in event.content.parts:
+                    # --- Text ---
+                    if part.text:
+                        full_text += part.text
+                        yield sse_event("text_chunk", {"text": part.text})
 
-                # --- Inline image from interleaved output ---
-                if hasattr(part, "inline_data") and part.inline_data and part.inline_data.data:
-                    from app.tools.gcs_tools import upload_image
+                    # --- Inline image from interleaved output ---
+                    if (
+                        hasattr(part, "inline_data")
+                        and part.inline_data
+                        and part.inline_data.data
+                    ):
+                        from app.tools.gcs_tools import upload_image
 
-                    gs_uri = upload_image(
-                        part.inline_data.data,
-                        f"sse/{session_id}/{id(part)}.png",
-                    )
-                    yield sse_event(
-                        "image_generated",
-                        {
-                            "gs_uri": gs_uri,
-                            "mime_type": part.inline_data.mime_type or "image/png",
-                        },
-                    )
-
-                # --- Function calls (agent calling a tool) ---
-                if part.function_call:
-                    tool_name = part.function_call.name
-                    tool_args = (
-                        dict(part.function_call.args)
-                        if part.function_call.args
-                        else {}
-                    )
-                    if tool_name == "add_lorebook_entry":
+                        gs_uri = upload_image(
+                            part.inline_data.data,
+                            f"sse/{session_id}/{id(part)}.png",
+                        )
                         yield sse_event(
-                            "lorebook_updated",
+                            "image_generated",
                             {
-                                "entry_name": tool_args.get("name", ""),
-                                "category": tool_args.get("category", ""),
+                                "gs_uri": gs_uri,
+                                "mime_type": part.inline_data.mime_type or "image/png",
                             },
                         )
-                    elif tool_name == "generate_chapter":
-                        yield sse_event(
-                            "thinking",
-                            {"text": "Generating illustrated chapter..."},
-                        )
-                    elif tool_name == "search_lore":
-                        yield sse_event(
-                            "thinking",
-                            {"text": "Searching lorebook for relevant lore..."},
-                        )
-                    elif tool_name == "get_lorebook":
-                        yield sse_event(
-                            "thinking",
-                            {"text": "Reading lorebook entries..."},
-                        )
-                    elif tool_name == "validate_lorebook_consistency":
-                        yield sse_event(
-                            "thinking",
-                            {"text": "Validating lorebook consistency..."},
-                        )
-                    elif tool_name == "update_session_status":
-                        yield sse_event(
-                            "thinking",
-                            {"text": f"Session status → {tool_args.get('status', '')}"},
-                        )
 
-                # --- Function responses (tool results) ---
-                if part.function_response:
-                    fn_name = getattr(part.function_response, "name", "")
-                    if fn_name == "generate_chapter":
-                        result_obj = part.function_response.response
-                        raw_result = (
-                            result_obj.get("result", "")
-                            if isinstance(result_obj, dict)
-                            else str(result_obj)
+                    # --- Function calls (agent calling a tool) ---
+                    if part.function_call:
+                        tool_name = part.function_call.name
+                        tool_args = (
+                            dict(part.function_call.args)
+                            if part.function_call.args
+                            else {}
                         )
-                        for img in _extract_inline_images(raw_result):
+                        if tool_name == "add_lorebook_entry":
                             yield sse_event(
-                                "image_generated",
+                                "lorebook_updated",
                                 {
-                                    "gs_uri": img.get("gs_uri", ""),
-                                    "index": img.get("index", 0),
+                                    "entry_name": tool_args.get("name", ""),
+                                    "category": tool_args.get("category", ""),
                                 },
                             )
-                    elif fn_name == "search_lore":
-                        result_obj = part.function_response.response
-                        raw_result = (
-                            result_obj.get("result", "")
-                            if isinstance(result_obj, dict)
-                            else str(result_obj)
-                        )
-                        try:
-                            entries = json.loads(raw_result) if isinstance(raw_result, str) else raw_result
-                            if isinstance(entries, list):
-                                entry_names = [e.get("name", "") for e in entries if e.get("name")]
-                                if entry_names:
-                                    yield sse_event("lore_cited", {"entries": entry_names})
-                        except (json.JSONDecodeError, TypeError):
-                            pass
+                        elif tool_name == "generate_chapter":
+                            yield sse_event(
+                                "thinking",
+                                {"text": "Generating illustrated chapter..."},
+                            )
+                        elif tool_name == "search_lore":
+                            yield sse_event(
+                                "thinking",
+                                {"text": "Searching lorebook for relevant lore..."},
+                            )
+                        elif tool_name == "get_lorebook":
+                            yield sse_event(
+                                "thinking",
+                                {"text": "Reading lorebook entries..."},
+                            )
+                        elif tool_name == "validate_lorebook_consistency":
+                            yield sse_event(
+                                "thinking",
+                                {"text": "Validating lorebook consistency..."},
+                            )
+                        elif tool_name == "update_session_status":
+                            yield sse_event(
+                                "thinking",
+                                {
+                                    "text": f"Session status → {tool_args.get('status', '')}"
+                                },
+                            )
+                        elif tool_name == "generate_character_image":
+                            yield sse_event(
+                                "thinking",
+                                {
+                                    "text": f"Generating portrait for {tool_args.get('character_name', 'character')}..."
+                                },
+                            )
+                        elif tool_name == "generate_scene_image":
+                            yield sse_event(
+                                "thinking",
+                                {
+                                    "text": f"Generating scene: {tool_args.get('scene_name', 'scene')}..."
+                                },
+                            )
+
+                    # --- Function responses (tool results) ---
+                    if part.function_response:
+                        fn_name = getattr(part.function_response, "name", "")
+                        if fn_name == "generate_chapter":
+                            result_obj = part.function_response.response
+                            raw_result = (
+                                result_obj.get("result", "")
+                                if isinstance(result_obj, dict)
+                                else str(result_obj)
+                            )
+                            for img in _extract_inline_images(raw_result):
+                                yield sse_event(
+                                    "image_generated",
+                                    {
+                                        "gs_uri": img.get("gs_uri", ""),
+                                        "index": img.get("index", 0),
+                                    },
+                                )
+                        elif fn_name in (
+                            "generate_character_image",
+                            "generate_scene_image",
+                        ):
+                            result_obj = part.function_response.response
+                            raw_result = (
+                                result_obj.get("result", "")
+                                if isinstance(result_obj, dict)
+                                else str(result_obj)
+                            )
+                            try:
+                                img_data = (
+                                    json.loads(raw_result)
+                                    if isinstance(raw_result, str)
+                                    else raw_result
+                                )
+                                if isinstance(img_data, dict) and img_data.get(
+                                    "gs_uri"
+                                ):
+                                    yield sse_event(
+                                        "image_generated",
+                                        {
+                                            "gs_uri": img_data["gs_uri"],
+                                            "mime_type": "image/png",
+                                        },
+                                    )
+                            except (json.JSONDecodeError, TypeError):
+                                pass
+                        elif fn_name == "search_lore":
+                            result_obj = part.function_response.response
+                            raw_result = (
+                                result_obj.get("result", "")
+                                if isinstance(result_obj, dict)
+                                else str(result_obj)
+                            )
+                            try:
+                                entries = (
+                                    json.loads(raw_result)
+                                    if isinstance(raw_result, str)
+                                    else raw_result
+                                )
+                                if isinstance(entries, list):
+                                    entry_names = [
+                                        e.get("name", "")
+                                        for e in entries
+                                        if e.get("name")
+                                    ]
+                                    if entry_names:
+                                        yield sse_event(
+                                            "lore_cited", {"entries": entry_names}
+                                        )
+                            except (json.JSONDecodeError, TypeError):
+                                pass
+        except Exception as exc:
+            _logger.exception("Agent stream error session=%s: %s", session_id, exc)
+            yield sse_event("error", {"message": f"Agent error: {exc}"})
 
     yield sse_event("done", {"full_text": full_text})

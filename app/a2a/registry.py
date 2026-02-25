@@ -9,7 +9,7 @@ character-level agent granularity.
 
 import logging
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from a2a.server.request_handlers.default_request_handler import (
     DefaultRequestHandler,
@@ -37,12 +37,16 @@ class AgentRegistry:
     """Manages dynamically registered lorebook agents."""
 
     def __init__(self, base_url: str | None = None):
-        self._base_url = (base_url or os.getenv("A2A_BASE_URL", "http://localhost:8000")).rstrip("/")
+        self._base_url = (
+            base_url or os.getenv("A2A_BASE_URL", "http://localhost:8000")
+        ).rstrip("/")
         self._agents: dict[str, RegisteredAgent] = {}
         # Map lorebook_id -> agent_id for dedup
         self._lorebook_to_agent: dict[str, str] = {}
 
-    def register_lorebook(self, lorebook_id: str, lorebook_data: dict, public_entries: list[dict]) -> str:
+    def register_lorebook(
+        self, lorebook_id: str, lorebook_data: dict, public_entries: list[dict]
+    ) -> str:
         """Register a lorebook as an A2A agent.
 
         Args:
@@ -76,11 +80,13 @@ class AgentRegistry:
                 id="world_knowledge",
                 name=f"{title} World Knowledge",
                 description=(
-                    f"Can answer questions about the world of \"{title}\" "
+                    f'Can answer questions about the world of "{title}" '
                     f"based on {len(public_entries)} public lore entries. "
                     f"Categories: {', '.join(sorted(entry_categories))}."
                 ),
-                tags=["worldbuilding", "lore", genre] if genre else ["worldbuilding", "lore"],
+                tags=["worldbuilding", "lore", genre]
+                if genre
+                else ["worldbuilding", "lore"],
                 examples=[
                     f"Tell me about the world of {title}",
                     f"What are the main characters in {title}?",
@@ -94,7 +100,7 @@ class AgentRegistry:
                     id="character_interaction",
                     name="Character Interaction",
                     description=(
-                        f"Can roleplay or answer as characters from \"{title}\": "
+                        f'Can roleplay or answer as characters from "{title}": '
                         f"{', '.join(character_names[:5])}"
                         f"{'...' if len(character_names) > 5 else ''}."
                     ),
@@ -111,7 +117,8 @@ class AgentRegistry:
 
         agent_card = AgentCard(
             name=f"{title} Agent",
-            description=description or f"A2A agent representing the world of \"{title}\".",
+            description=description
+            or f'A2A agent representing the world of "{title}".',
             url=agent_url,
             version="0.1.0",
             capabilities=AgentCapabilities(streaming=False),
@@ -142,7 +149,10 @@ class AgentRegistry:
 
         logger.info(
             "Registered lorebook '%s' (id=%s) as A2A agent '%s' with %d public entries",
-            title, lorebook_id, agent_id, len(public_entries),
+            title,
+            lorebook_id,
+            agent_id,
+            len(public_entries),
         )
         return agent_id
 
@@ -167,23 +177,25 @@ class AgentRegistry:
         results = []
         for agent in self._agents.values():
             card = agent.agent_card
-            results.append({
-                "id": agent.agent_id,
-                "name": card.name,
-                "description": card.description,
-                "url": card.url,
-                "lorebook_id": agent.lorebook_id,
-                "skills": [
-                    {
-                        "id": s.id,
-                        "name": s.name,
-                        "description": s.description,
-                        "tags": s.tags or [],
-                    }
-                    for s in (card.skills or [])
-                ],
-                "status": "active",
-            })
+            results.append(
+                {
+                    "id": agent.agent_id,
+                    "name": card.name,
+                    "description": card.description,
+                    "url": card.url,
+                    "lorebook_id": agent.lorebook_id,
+                    "skills": [
+                        {
+                            "id": s.id,
+                            "name": s.name,
+                            "description": s.description,
+                            "tags": s.tags or [],
+                        }
+                        for s in (card.skills or [])
+                    ],
+                    "status": "active",
+                }
+            )
         return results
 
     def sync_from_firestore(self) -> dict:
@@ -235,7 +247,9 @@ class AgentRegistry:
 
         logger.info(
             "Registry sync complete: %d registered, %d unregistered, %d total active",
-            registered, unregistered, len(self._agents),
+            registered,
+            unregistered,
+            len(self._agents),
         )
         return {
             "registered": registered,

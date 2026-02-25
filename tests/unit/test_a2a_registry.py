@@ -47,19 +47,25 @@ class TestRegisterLorebook:
         agent_id = registry.register_lorebook("lb-001", sample_lorebook, sample_entries)
         assert agent_id == "lb-lb-001"
 
-    def test_agent_card_has_correct_name(self, registry, sample_lorebook, sample_entries):
+    def test_agent_card_has_correct_name(
+        self, registry, sample_lorebook, sample_entries
+    ):
         agent_id = registry.register_lorebook("lb-001", sample_lorebook, sample_entries)
         card = registry.get_card(agent_id)
         assert card is not None
         assert card.name == "Fantasy World Agent"
 
-    def test_agent_card_includes_world_knowledge_skill(self, registry, sample_lorebook, sample_entries):
+    def test_agent_card_includes_world_knowledge_skill(
+        self, registry, sample_lorebook, sample_entries
+    ):
         agent_id = registry.register_lorebook("lb-001", sample_lorebook, sample_entries)
         card = registry.get_card(agent_id)
         skill_ids = {s.id for s in card.skills}
         assert "world_knowledge" in skill_ids
 
-    def test_agent_card_includes_character_interaction_skill(self, registry, sample_lorebook, sample_entries):
+    def test_agent_card_includes_character_interaction_skill(
+        self, registry, sample_lorebook, sample_entries
+    ):
         """Should include character_interaction skill when character entries exist."""
         agent_id = registry.register_lorebook("lb-001", sample_lorebook, sample_entries)
         card = registry.get_card(agent_id)
@@ -87,14 +93,18 @@ class TestRegisterLorebook:
         card = registry.get_card(agent_id)
         assert card.url == "http://localhost:8000/a2a/agents/lb-lb-001/"
 
-    def test_agent_card_declares_image_output(self, registry, sample_lorebook, sample_entries):
+    def test_agent_card_declares_image_output(
+        self, registry, sample_lorebook, sample_entries
+    ):
         """AgentCard should include image/png in default_output_modes."""
         agent_id = registry.register_lorebook("lb-001", sample_lorebook, sample_entries)
         card = registry.get_card(agent_id)
         assert "text/plain" in card.default_output_modes
         assert "image/png" in card.default_output_modes
 
-    def test_reregistration_updates_agent(self, registry, sample_lorebook, sample_entries):
+    def test_reregistration_updates_agent(
+        self, registry, sample_lorebook, sample_entries
+    ):
         """Re-registering the same lorebook should update the existing agent."""
         registry.register_lorebook("lb-001", sample_lorebook, sample_entries)
         assert len(registry.list_agents()) == 1
@@ -133,7 +143,15 @@ class TestListAgents:
         registry.register_lorebook(
             "lb-002",
             {"title": "Sci-Fi World", "genre": "sci-fi", "description": ""},
-            [{"name": "Space Ship", "category": "item", "content": "A ship.", "tags": [], "visibility": "public"}],
+            [
+                {
+                    "name": "Space Ship",
+                    "category": "item",
+                    "content": "A ship.",
+                    "tags": [],
+                    "visibility": "public",
+                }
+            ],
         )
 
         agents = registry.list_agents()
@@ -163,7 +181,9 @@ class TestGetCard:
     def test_returns_none_for_unknown(self, registry):
         assert registry.get_card("nonexistent") is None
 
-    def test_returns_card_for_registered(self, registry, sample_lorebook, sample_entries):
+    def test_returns_card_for_registered(
+        self, registry, sample_lorebook, sample_entries
+    ):
         agent_id = registry.register_lorebook("lb-001", sample_lorebook, sample_entries)
         card = registry.get_card(agent_id)
         assert card is not None
@@ -195,16 +215,18 @@ class TestLorebookAgentExecutor:
 
     def test_accepts_image_false_by_default(self):
         """_accepts_image should return False when no output modes specified."""
-        from app.a2a.lorebook_executor import LorebookAgentExecutor
         from unittest.mock import MagicMock
+
+        from app.a2a.lorebook_executor import LorebookAgentExecutor
 
         ctx = MagicMock(spec=[])  # No accepted_output_modes attr
         assert LorebookAgentExecutor._accepts_image(ctx) is False
 
     def test_accepts_image_true_for_image_star(self):
         """_accepts_image should return True for image/*."""
-        from app.a2a.lorebook_executor import LorebookAgentExecutor
         from unittest.mock import MagicMock
+
+        from app.a2a.lorebook_executor import LorebookAgentExecutor
 
         ctx = MagicMock()
         ctx.accepted_output_modes = ["text/plain", "image/*"]
@@ -212,8 +234,9 @@ class TestLorebookAgentExecutor:
 
     def test_accepts_image_true_for_image_png(self):
         """_accepts_image should return True for image/png."""
-        from app.a2a.lorebook_executor import LorebookAgentExecutor
         from unittest.mock import MagicMock
+
+        from app.a2a.lorebook_executor import LorebookAgentExecutor
 
         ctx = MagicMock()
         ctx.accepted_output_modes = ["image/png"]
@@ -221,8 +244,9 @@ class TestLorebookAgentExecutor:
 
     def test_accepts_image_false_for_text_only(self):
         """_accepts_image should return False for text/plain only."""
-        from app.a2a.lorebook_executor import LorebookAgentExecutor
         from unittest.mock import MagicMock
+
+        from app.a2a.lorebook_executor import LorebookAgentExecutor
 
         ctx = MagicMock()
         ctx.accepted_output_modes = ["text/plain"]

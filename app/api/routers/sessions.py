@@ -120,7 +120,9 @@ def _build_conjure_prompt(body: "ConjureRequest", session: dict) -> str:
     """Build a structured, genre-aware conjure prompt from the 4-step wizard selections."""
 
     # --- Step 1: Genre ---
-    genre_desc = GENRE_GUIDE.get(body.genre, f"Custom genre: {body.genre}. Adapt tone and themes accordingly.")
+    genre_desc = GENRE_GUIDE.get(
+        body.genre, f"Custom genre: {body.genre}. Adapt tone and themes accordingly."
+    )
 
     # --- Step 2: World (Era + Essence) ---
     era_label = body.world_era.replace("_", " ").title()
@@ -131,14 +133,20 @@ def _build_conjure_prompt(body: "ConjureRequest", session: dict) -> str:
             essence_descs.append(f"  - {e.replace('_', ' ').title()}: {desc}")
         else:
             essence_descs.append(f"  - Custom essence: {e}")
-    essence_block = "\n".join(essence_descs) if essence_descs else "  - No specific essence specified."
+    essence_block = (
+        "\n".join(essence_descs)
+        if essence_descs
+        else "  - No specific essence specified."
+    )
 
     # --- Step 3: Protagonist ---
     archetype_desc = ARCHETYPE_GUIDE.get(
         body.protagonist_archetype,
         f"Custom archetype: {body.protagonist_archetype}. Create a unique character concept.",
     )
-    virtues_str = ", ".join(v.replace("_", " ").title() for v in body.protagonist_virtues)
+    virtues_str = ", ".join(
+        v.replace("_", " ").title() for v in body.protagonist_virtues
+    )
     shadow_desc = SHADOW_GUIDE.get(
         body.protagonist_shadow,
         f"Custom shadow/flaw: {body.protagonist_shadow}.",
@@ -243,9 +251,7 @@ async def get_session(
     chapters = []
     if lorebook_id:
         chapters_ref = (
-            db.collection("stories")
-            .document(lorebook_id)
-            .collection("chapters")
+            db.collection("stories").document(lorebook_id).collection("chapters")
         )
         for ch in chapters_ref.order_by("chapter_number").stream():
             ch_data = ch.to_dict()
@@ -295,10 +301,13 @@ async def conjure_session(
 
     # Store preferences in session for subsequent messages
     from app.api.dependencies import get_firestore_client as _get_db
-    _get_db().collection("story_sessions").document(session["id"]).update({
-        "chapter_length": body.chapter_length,
-        "writing_style": body.writing_style,
-    })
+
+    _get_db().collection("story_sessions").document(session["id"]).update(
+        {
+            "chapter_length": body.chapter_length,
+            "writing_style": body.writing_style,
+        }
+    )
 
     conjure_prompt = _build_conjure_prompt(body, session)
 
@@ -308,7 +317,10 @@ async def conjure_session(
             user_message=conjure_prompt,
             user_id=current_user.uid,
         ),
-        headers={"X-Session-Id": session["id"], "X-Lorebook-Id": session["lorebook_id"]},
+        headers={
+            "X-Session-Id": session["id"],
+            "X-Lorebook-Id": session["lorebook_id"],
+        },
     )
 
 

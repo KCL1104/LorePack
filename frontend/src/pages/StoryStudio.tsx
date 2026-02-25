@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { animate, stagger } from 'animejs';
 import type { ShaderMaterial } from 'three';
 
-import { conjureSession, sendMessage, type ConjureParams, type SSEEvent } from '../api';
+import { conjureSession, getSession as fetchSessionDetail, sendMessage, type ConjureParams, type SSEEvent, type SessionDetail } from '../api';
 import { Button, Card, Input, SectionHeader, Tag } from '../components/ui';
 import { useAppStore } from '../stores/appStore';
 import styles from './StoryStudio.module.css';
@@ -281,7 +282,8 @@ function InkDiffusionField() {
 }
 
 export default function StoryStudio() {
-  const [phase, setPhase] = useState<'conjure' | 'desk'>('conjure');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [phase, setPhase] = useState<'select' | 'conjure' | 'desk'>('select');
   const [stepIndex, setStepIndex] = useState(0);
   const [form, setForm] = useState<ConjureForm>(INITIAL_FORM);
 
@@ -306,20 +308,90 @@ export default function StoryStudio() {
     loreRefs: string[];
     images: ChapterImage[];
   } | null>(null);
+  const [loadingSession, setLoadingSession] = useState(false);
 
   const stepDirectionRef = useRef(1);
   const previousStepRef = useRef(0);
   const idCounterRef = useRef(0);
+  const autoResumeAttempted = useRef(false);
 
+  const sessions = useAppStore((state) => state.sessions);
   const fetchSessions = useAppStore((state) => state.fetchSessions);
   const fetchSession = useAppStore((state) => state.fetchSession);
   const setSidebarDimmed = useAppStore((state) => state.setSidebarDimmed);
+  const addToast = useAppStore((state) => state.addToast);
+
+  // Load sessions on mount for the select phase
+  useEffect(() => {
+    void fetchSessions();
+  }, [fetchSessions]);
+
+  // Auto-resume from ?session= query param (e.g. clicked from Dashboard)
+  useEffect(() => {
+    if (autoResumeAttempted.current) return;
+    const resumeId = searchParams.get('session');
+    if (!resumeId) return;
+
+    autoResumeAttempted.current = true;
+    void handleResumeSession(resumeId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Dim sidebar during conjure phase
   useEffect(() => {
     setSidebarDimmed(phase === 'conjure');
     return () => setSidebarDimmed(false);
   }, [phase, setSidebarDimmed]);
+
+  const handleResumeSession = async (sid: string) => {
+    setLoadingSession(true);
+    setError(null);
+    try {
+      const detail: SessionDetail = await fetchSessionDetail(sid);
+      setSessionId(detail.id);
+      setLorebookId(detail.lorebook_id);
+
+      // Populate form context from session data
+      setForm((prev) => ({
+        ...prev,
+        genre: detail.genre || prev.genre,
+        worldEra: detail.world_era || prev.worldEra,
+        protagonistArchetype: detail.protagonist_archetype || prev.protagonistArchetype,
+        protagonistShadow: detail.protagonist_shadow || prev.protagonistShadow,
+        protagonistVirtues: detail.protagonist_virtues?.length ? detail.protagonist_virtues : prev.protagonistVirtues,
+      }));
+
+      // Load chapters from backend
+      if (detail.chapters && detail.chapters.length > 0) {
+        setChapters(
+          detail.chapters.map((ch, idx) => ({
+            id: createId('chapter'),
+            title: ch.chapter_title || `Chapter ${ch.chapter_number || idx + 1}`,
+            body: ch.body,
+            loreRefs: ch.lore_referenced || [],
+            images: (ch.inline_images || []).map((img) => ({
+              gs_uri: img.gs_uri,
+              mime_type: img.mime_type || 'image/png',
+              index: img.index,
+            })),
+          })),
+        );
+      }
+
+      setWorldApproved(true);
+      setPhase('desk');
+      setStatusText('Session resumed. The Narrative Director awaits your next instruction.');
+      addToast({ variant: 'success', message: `Resumed: ${formatLabel(detail.genre)} · ${formatLabel(detail.world_era)}` });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to load session.';
+      setError(msg);
+      addToast({ variant: 'error', message: msg });
+    } finally {
+      setLoadingSession(false);
+      // Clear the query param
+      setSearchParams({}, { replace: true });
+    }
+  };
 
   const canProceedStep = useMemo(() => {
     if (stepIndex === 0) return Boolean(form.genre) && (form.genre !== 'custom' || Boolean(form.customGenre.trim()));
@@ -538,11 +610,15 @@ export default function StoryStudio() {
           // mode === 'review' → chat-only, no chapter or preview mutation
         }
 
-        setStatusText(
-          mode === 'conjure'
-            ? 'World conjured. Review the lore, then approve or request changes.'
-            : 'The Narrative Director awaits your next instruction.',
-        );
+        if (mode === 'conjure') {
+          setStatusText('World conjured. Review the lore, then approve or request changes.');
+          addToast({ variant: 'success', message: 'World conjured successfully! Review and approve to begin.' });
+        } else if (mode === 'chapter') {
+          setStatusText('The Narrative Director awaits your next instruction.');
+          addToast({ variant: 'success', message: `Chapter generated successfully!` });
+        } else {
+          setStatusText('The Narrative Director awaits your next instruction.');
+        }
       }
     }
   };
@@ -958,6 +1034,32 @@ export default function StoryStudio() {
     );
   };
 
+  const renderChapterBody = (text: string, chapterImages: ChapterImage[] = []) => {
+    // Split on [illustration:N] markers and paragraph breaks
+    const segments = text.split(/(\[illustration:\d+\])/g);
+    return segments.map((segment, idx) => {
+      const illustrationMatch = segment.match(/^\[illustration:(\d+)\]$/);
+      if (illustrationMatch) {
+        const imgIdx = parseInt(illustrationMatch[1], 10);
+        const img = chapterImages.find((i) => i.index === imgIdx);
+        return (
+          <div key={`ill-${idx}`} className={styles.illustrationPlaceholder}>
+            {img ? (
+              <p className={styles.illustrationLabel}>Scene illustration generated</p>
+            ) : (
+              <p className={styles.illustrationLabel}>Illustration {imgIdx + 1}</p>
+            )}
+          </div>
+        );
+      }
+      // Render paragraphs from double newlines
+      const paragraphs = segment.split(/\n\n+/).filter((p) => p.trim());
+      return paragraphs.map((para, pIdx) => (
+        <p key={`p-${idx}-${pIdx}`} className={styles.chapterParagraph}>{para}</p>
+      ));
+    });
+  };
+
   return (
     <div className={styles.page}>
       {isGenerating && phase === 'desk' ? (
@@ -965,10 +1067,77 @@ export default function StoryStudio() {
           <Canvas camera={{ position: [0, 0, 2.2], fov: 50 }} dpr={[1, 1.5]}>
             <InkDiffusionField />
           </Canvas>
+          <div className={styles.loadingOverlay}>
+            <span className={styles.loadingIcon}>✦</span>
+            <p className={styles.loadingText}>{statusText}</p>
+          </div>
         </div>
       ) : null}
 
-      {phase === 'conjure' ? (
+      {phase === 'select' ? (
+        <section className={styles.conjurePanel}>
+          <header className={styles.header}>
+            <p className={styles.kicker}>The Writing Desk</p>
+            <h1 className={styles.title}>Story Studio</h1>
+            <p className={styles.subtitle}>
+              Begin a new tale from scratch, or continue weaving an existing story.
+            </p>
+          </header>
+
+          {error ? <div className={styles.errorBanner}>{error}</div> : null}
+          {loadingSession ? (
+            <Card hoverable={false} className={styles.stepCard}>
+              <p className={styles.placeholderText}>Loading session…</p>
+            </Card>
+          ) : (
+            <>
+              <div className={styles.selectGrid}>
+                <Card className={styles.selectCard} onClick={() => setPhase('conjure')}>
+                  <span className={styles.selectIcon}>✦</span>
+                  <h3 className={styles.selectCardTitle}>Begin a New Tale</h3>
+                  <p className={styles.selectCardDesc}>
+                    Conjure a fresh world with genre, era, protagonist, and spark.
+                  </p>
+                </Card>
+
+                <Card hoverable={false} className={styles.selectCard}>
+                  <span className={styles.selectIcon}>↻</span>
+                  <h3 className={styles.selectCardTitle}>Continue an Existing Tale</h3>
+                  <p className={styles.selectCardDesc}>
+                    Resume a previous story session and keep writing.
+                  </p>
+                </Card>
+              </div>
+
+              {sessions.length > 0 ? (
+                <div className={styles.sessionList}>
+                  <SectionHeader title="Your Stories" />
+                  {sessions.map((s) => (
+                    <Card
+                      key={s.id}
+                      className={styles.sessionRow}
+                      onClick={() => { void handleResumeSession(s.id); }}
+                    >
+                      <div className={styles.sessionRowLeft}>
+                        <Tag label={formatLabel(s.genre)} selected />
+                        <Tag label={formatLabel(s.world_era)} />
+                        <Tag label={formatLabel(s.status)} />
+                      </div>
+                      <p className={styles.sessionRowMeta}>
+                        {s.updated_at ? new Date(s.updated_at).toLocaleDateString() : 'Unknown'}
+                      </p>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card hoverable={false} className={styles.emptySessionCard}>
+                  <p className={styles.placeholderText}>No existing stories yet. Begin a new tale to get started.</p>
+                </Card>
+              )}
+            </>
+          )}
+        </section>
+      ) : phase === 'conjure' ? (
         <section className={styles.conjurePanel} data-step-panel>
           <header className={styles.header}>
             <p className={styles.kicker}>Conjure Your World</p>
@@ -1072,7 +1241,7 @@ export default function StoryStudio() {
               {!worldApproved && worldPreview ? (
                 <article className={styles.chapterBody}>
                   <span className={styles.previewBadge}>World Preview</span>
-                  <p className={styles.chapterText}>{worldPreview.text}</p>
+                  {renderChapterBody(worldPreview.text, worldPreview.images)}
 
                   {worldPreview.loreRefs.length > 0 ? (
                     <div className={styles.loreCited}>
@@ -1088,7 +1257,7 @@ export default function StoryStudio() {
               ) : selectedChapter ? (
                 <article className={styles.chapterBody}>
                   <h3 className={styles.chapterTitle}>{selectedChapter.title}</h3>
-                  <p className={styles.chapterText}>{selectedChapter.body}</p>
+                  {renderChapterBody(selectedChapter.body, selectedChapter.images)}
 
                   {selectedChapter.loreRefs.length > 0 ? (
                     <div className={styles.loreCited}>
@@ -1157,6 +1326,17 @@ export default function StoryStudio() {
                 </div>
               ) : (
                 <div className={styles.chatComposer}>
+                  {worldApproved && chapters.length > 0 && !messageDraft.trim() && !isGenerating ? (
+                    <Button
+                      variant="ghost"
+                      className={styles.continueButton}
+                      onClick={() => {
+                        setMessageDraft('Continue to the next chapter.');
+                      }}
+                    >
+                      ✦ Continue Story
+                    </Button>
+                  ) : null}
                   <Input
                     value={messageDraft}
                     onChange={(event) => setMessageDraft(event.target.value)}
@@ -1186,8 +1366,9 @@ export default function StoryStudio() {
                   type="button"
                   className={`${styles.chapterDot}${index === activeChapterIndex ? ` ${styles.chapterDotActive}` : ''}`}
                   onClick={() => setActiveChapterIndex(index)}
+                  title={chapter.title}
                 >
-                  {index <= activeChapterIndex ? '✦' : '○'}
+                  {index <= activeChapterIndex ? '✦' : '○'} {chapter.title.length > 20 ? `${chapter.title.slice(0, 18)}…` : chapter.title}
                 </button>
               ))}
             </div>

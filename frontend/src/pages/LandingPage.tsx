@@ -6,6 +6,22 @@ import * as THREE from 'three';
 import { Divider } from '../components/ui';
 import styles from './LandingPage.module.css';
 
+// Pre-generate particle data outside the component to avoid impure calls during render
+function createParticles(count: number) {
+    const temp = [];
+    for (let i = 0; i < count; i++) {
+        const x = (Math.random() - 0.5) * 20;
+        const y = (Math.random() - 0.5) * 20;
+        const z = (Math.random() - 0.5) * 10;
+        const factor = Math.random() * 0.5 + 0.1;
+        const speed = Math.random() * 0.01 + 0.005;
+        temp.push({ t: Math.random() * 100, x, y, z, factor, speed });
+    }
+    return temp;
+}
+
+const DEFAULT_PARTICLES = createParticles(80);
+
 // Particle Background — reacts to scroll position
 function ParticleSystem({ count = 80 }) {
     const mesh = useRef<THREE.InstancedMesh>(null);
@@ -18,18 +34,8 @@ function ParticleSystem({ count = 80 }) {
         return () => window.removeEventListener('scroll', onScroll);
     }, []);
 
-    const particles = useMemo(() => {
-        const temp = [];
-        for (let i = 0; i < count; i++) {
-            const x = (Math.random() - 0.5) * 20;
-            const y = (Math.random() - 0.5) * 20;
-            const z = (Math.random() - 0.5) * 10;
-            const factor = Math.random() * 0.5 + 0.1;
-            const speed = Math.random() * 0.01 + 0.005;
-            temp.push({ t: Math.random() * 100, x, y, z, factor, speed });
-        }
-        return temp;
-    }, [count]);
+    const particlesRef = useRef(count === 80 ? DEFAULT_PARTICLES : createParticles(count));
+    const particles = particlesRef.current;
 
     useFrame(() => {
         if (!mesh.current) return;
@@ -37,8 +43,8 @@ function ParticleSystem({ count = 80 }) {
         const scrollOffset = scrollY.current * 0.001;
 
         particles.forEach((particle, i) => {
-            let { t, factor, speed, x, y, z } = particle;
-            t += speed;
+            const { factor, speed, x, y, z } = particle;
+            const t = particle.t + speed;
             particle.t = t;
 
             dummy.position.set(

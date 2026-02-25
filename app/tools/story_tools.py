@@ -12,8 +12,6 @@ from google.genai import types
 from app.tools.user_context import resolve_owner_uid
 
 _STORY_MODEL = "gemini-3-flash-preview"
-_cached_genai = None
-_cached_db = None
 
 
 def _is_test_mode() -> bool:
@@ -54,34 +52,21 @@ def _story_top_k() -> int:
 
 
 def _get_genai_client():
-    """Lazy singleton for genai client."""
-    global _cached_genai
-    if _cached_genai is None:
-        from google import genai
-        from google.cloud import firestore
+    from app.tools._firestore import get_genai_client
 
-        db = firestore.Client()
-        _cached_genai = genai.Client(
-            vertexai=True, project=db.project, location="global"
-        )
-    return _cached_genai
+    return get_genai_client()
 
 
 def _get_db():
-    """Lazy singleton for Firestore client."""
-    global _cached_db
-    if _cached_db is None:
-        from google.cloud import firestore
+    from app.tools._firestore import get_db
 
-        _cached_db = firestore.Client()
-    return _cached_db
+    return get_db()
 
 
 def _build_lore_context(lore_results: list[dict]) -> str:
     """Format retrieved lore entries into a prompt context block."""
     return "\n\n".join(
-        f"[{r['category'].upper()}] {r['name']}:\n{r['content']}"
-        for r in lore_results
+        f"[{r['category'].upper()}] {r['name']}:\n{r['content']}" for r in lore_results
     )
 
 
@@ -108,16 +93,18 @@ def _parse_interleaved_response(
         elif part.inline_data and part.inline_data.data:
             img_idx = len(inline_images)
             gcs_path = (
-                f"stories/{lorebook_id}/ch{chapter_number}_{img_idx}.png"
+                f"stories/{owner_uid}/{lorebook_id}/ch{chapter_number}_{img_idx}.png"
             )
             gs_uri = upload_image(part.inline_data.data, gcs_path)
 
-            inline_images.append({
-                "index": img_idx,
-                "gs_uri": gs_uri,
-                "mime_type": part.inline_data.mime_type or "image/png",
-                "position": len(body_segments),
-            })
+            inline_images.append(
+                {
+                    "index": img_idx,
+                    "gs_uri": gs_uri,
+                    "mime_type": part.inline_data.mime_type or "image/png",
+                    "position": len(body_segments),
+                }
+            )
             body_segments.append(f"\n\n[illustration:{img_idx}]\n\n")
 
     body = "".join(body_segments)
@@ -137,19 +124,21 @@ def _parse_interleaved_response(
     if inline_images:
         image_col = _get_db().collection("image_assets")
         for img in inline_images:
-            image_col.add({
-                "status": "success",
-                "asset_type": "scene",
-                "scene_name": (
-                    f"{chapter_title} — Illustration {img['index'] + 1}"
-                ),
-                "prompt_used": f"Interleaved illustration for: {premise}",
-                "gs_uri": img["gs_uri"],
-                "lorebook_id": lorebook_id,
-                "owner_uid": owner_uid,
-                "art_style": "interleaved",
-                "generated_at": now,
-            })
+            image_col.add(
+                {
+                    "status": "success",
+                    "asset_type": "scene",
+                    "scene_name": (
+                        f"{chapter_title} — Illustration {img['index'] + 1}"
+                    ),
+                    "prompt_used": f"Interleaved illustration for: {premise}",
+                    "gs_uri": img["gs_uri"],
+                    "lorebook_id": lorebook_id,
+                    "owner_uid": owner_uid,
+                    "art_style": "interleaved",
+                    "generated_at": now,
+                }
+            )
 
     return chapter_title, body, inline_images
 
@@ -183,9 +172,7 @@ def _parse_text_only_response(
 
     if len(body_text.strip()) < 100:
         lore_names = [r["name"] for r in lore_results[:3]]
-        lore_phrase = (
-            ", ".join(lore_names) if lore_names else "the established lore"
-        )
+        lore_phrase = ", ".join(lore_names) if lore_names else "the established lore"
         chapter["body"] = (
             f"{premise}\n\n"
             f"In {world_title}, the chapter opens by grounding the narrative "
@@ -438,9 +425,7 @@ def continue_story(lorebook_id: str, direction: str = "", owner_uid: str = "") -
     last_number = last_chapter.get("chapter_number", 0)
 
     # Gather arc context from all previous chapters (titles + premises)
-    all_chapters = list(
-        chapters_ref.order_by("chapter_number").stream()
-    )
+    all_chapters = list(chapters_ref.order_by("chapter_number").stream())
     arc_lines: list[str] = []
     for ch_snap in all_chapters:
         ch = ch_snap.to_dict()

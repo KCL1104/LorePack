@@ -600,6 +600,48 @@ export default function Crossroads() {
               <span className={styles.sectionMeta}>Agent-to-Agent Protocol</span>
             </SectionHeader>
 
+            <Card hoverable={false} className={styles.a2aGuideCard}>
+              <h3 className={styles.a2aGuideTitle}>What is A2A?</h3>
+              <p className={styles.a2aGuideDesc}>
+                The <strong>Agent-to-Agent (A2A) protocol</strong> lets LorePack agents communicate
+                with other deployed agents across the network — sharing world lore, answering
+                questions about characters, and enabling cross-world collaboration.
+              </p>
+
+              <div className={styles.a2aGuideSteps}>
+                <div className={styles.a2aGuideStep}>
+                  <span className={styles.a2aStepNum}>1</span>
+                  <div>
+                    <p className={styles.a2aStepTitle}>Deploy your agents</p>
+                    <p className={styles.a2aStepDesc}>
+                      Run <code>make deploy</code> from the project root to publish your lorebook
+                      agents to Google Agent Engine.
+                    </p>
+                  </div>
+                </div>
+                <div className={styles.a2aGuideStep}>
+                  <span className={styles.a2aStepNum}>2</span>
+                  <div>
+                    <p className={styles.a2aStepTitle}>Discover remote agents</p>
+                    <p className={styles.a2aStepDesc}>
+                      Enter a remote agent&apos;s URL below (e.g.
+                      <code>https://host/.well-known/agent-card.json</code>) and click Discover.
+                    </p>
+                  </div>
+                </div>
+                <div className={styles.a2aGuideStep}>
+                  <span className={styles.a2aStepNum}>3</span>
+                  <div>
+                    <p className={styles.a2aStepTitle}>Send messages</p>
+                    <p className={styles.a2aStepDesc}>
+                      Once discovered, you can chat with the remote agent — ask about their world&apos;s
+                      lore, characters, or propose collaborative story elements.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
             <Card hoverable={false} className={styles.a2aDiscoverCard}>
               <p className={styles.a2aLabel}>Discover a remote agent</p>
               <div className={styles.a2aDiscoverRow}>

@@ -10,17 +10,11 @@ from datetime import UTC, datetime
 
 from app.tools.user_context import resolve_owner_uid
 
-_cached_col = None
-
 
 def _get_sessions_col():
-    """Lazy singleton for Firestore story_sessions collection."""
-    global _cached_col
-    if _cached_col is None:
-        from google.cloud import firestore
+    from app.tools._firestore import get_db
 
-        _cached_col = firestore.Client().collection("story_sessions")
-    return _cached_col
+    return get_db().collection("story_sessions")
 
 
 def create_session(
@@ -49,7 +43,7 @@ def create_session(
     """
     from app.tools.lorebook_tools import create_lorebook
 
-    session_id = str(uuid.uuid4())[:8]
+    session_id = str(uuid.uuid4())[:12]
     resolved_owner_uid = resolve_owner_uid(owner_uid)
     now = datetime.now(UTC).isoformat()
 

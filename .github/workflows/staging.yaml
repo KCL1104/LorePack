@@ -23,6 +23,7 @@ on:
       - 'data_ingestion/**'
       - 'tests/**'
       - 'deployment/**'
+      - 'frontend/**'
       - 'uv.lock'
 
 jobs:
@@ -102,7 +103,7 @@ jobs:
           echo "_________________________________________________________________________"
 
   call_production_workflow:
-    needs: deploy_and_test_staging
+    needs: [deploy_and_test_staging, deploy_cloudrun_staging, deploy_frontend_staging]
     uses: ./.github/workflows/deploy-to-prod.yaml
     permissions:
       contents: 'read'

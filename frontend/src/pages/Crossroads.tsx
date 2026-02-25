@@ -650,9 +650,9 @@ export default function Crossroads() {
                   {a2aResult ? (
                     <div className={styles.a2aResponse}>
                       <p className={styles.a2aLabel}>Response</p>
-                      <p className={styles.a2aResponseText}>{a2aResult.text}</p>
+                      <p className={styles.a2aResponseText}>{a2aResult.response}</p>
                       <p className={styles.a2aResponseMeta}>
-                        Task: {a2aResult.task_id} · Status: {a2aResult.status}
+                        Status: {a2aResult.status}
                       </p>
                     </div>
                   ) : null}

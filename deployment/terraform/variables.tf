@@ -72,6 +72,7 @@ variable "cicd_roles" {
     "roles/aiplatform.user",
     "roles/discoveryengine.editor",
     "roles/logging.logWriter",
+    "roles/logging.viewer",
     "roles/cloudtrace.agent",
     "roles/artifactregistry.writer",
     "roles/cloudbuild.builds.builder"

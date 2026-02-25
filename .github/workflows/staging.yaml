@@ -120,10 +120,23 @@ jobs:
       - name: Build and push Docker image
         run: |
           IMAGE="${{ vars.REGION }}-docker.pkg.dev/${{ vars.STAGING_PROJECT_ID }}/lorepack-repo/lorepack-api:${{ github.sha }}"
-          gcloud builds submit \
+          BUILD_ID=$(gcloud builds submit \
             --tag "${IMAGE}" \
             --project "${{ vars.STAGING_PROJECT_ID }}" \
-            --quiet
+            --quiet \
+            --async \
+            --format='value(id)')
+          echo "Waiting for build ${BUILD_ID}..."
+          while true; do
+            STATUS=$(gcloud builds describe "$BUILD_ID" --project "${{ vars.STAGING_PROJECT_ID }}" --format='value(status)')
+            echo "Build status: $STATUS"
+            if [ "$STATUS" = "SUCCESS" ]; then break; fi
+            if [ "$STATUS" = "FAILURE" ] || [ "$STATUS" = "INTERNAL_ERROR" ] || [ "$STATUS" = "TIMEOUT" ] || [ "$STATUS" = "CANCELLED" ]; then
+              echo "Build failed with status: $STATUS"
+              exit 1
+            fi
+            sleep 15
+          done
 
       - name: Deploy to Cloud Run (Staging)
         uses: 'google-github-actions/deploy-cloudrun@v2'

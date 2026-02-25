@@ -9,6 +9,7 @@ import StoryStudio from './pages/StoryStudio';
 import LorebookEditor from './pages/LorebookEditor';
 import Gallery from './pages/Gallery';
 import Crossroads from './pages/Crossroads';
+import LandingPage from './pages/LandingPage';
 import { useAuthStore } from './stores/authStore';
 
 export default function App() {
@@ -29,10 +30,11 @@ export default function App() {
             <Route path="/lorebook" element={<LorebookEditor />} />
             <Route path="/gallery" element={<Gallery />} />
             <Route path="/crossroads" element={<Crossroads />} />
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>
         </Route>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

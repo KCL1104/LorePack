@@ -1,0 +1,477 @@
+.landingContainer {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-void);
+  color: var(--ink);
+  position: relative;
+  overflow-x: hidden;
+}
+
+.canvasContainer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ── Navbar ── */
+
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 4rem;
+  position: relative;
+  z-index: 10;
+  opacity: 0;
+}
+
+.logo {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: 0.1em;
+}
+
+.loginBtn {
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--gold-dim);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  transition: all var(--transition-base);
+  text-decoration: none;
+  letter-spacing: 0.05em;
+}
+
+.loginBtn:hover {
+  color: var(--gold);
+  text-decoration: underline;
+}
+
+/* ── Hero ── */
+
+.hero {
+  text-align: center;
+  margin-top: 12vh;
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+  position: relative;
+  z-index: 10;
+}
+
+.eyebrow {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--gold-dim);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 1.25rem;
+  opacity: 0;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: 3.5rem;
+  color: var(--gold);
+  margin-bottom: 1.5rem;
+  line-height: 1.15;
+  text-shadow: 0 0 30px var(--gold-glow);
+  opacity: 0;
+}
+
+.subtitle {
+  font-family: var(--font-body);
+  font-size: 1.35rem;
+  color: var(--ink);
+  margin-bottom: 2.5rem;
+  line-height: 1.7;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  opacity: 0;
+}
+
+.ctaGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  opacity: 0;
+}
+
+.ctaBtn {
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--gold);
+  background: transparent;
+  border: 1px solid var(--gold);
+  padding: 0.875rem 2.25rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.ctaBtn:hover {
+  background: var(--gold);
+  color: var(--bg-void);
+  box-shadow: 0 0 20px var(--gold-glow);
+}
+
+.ctaHint {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+
+/* ── Section shared ── */
+
+.mainContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 10;
+  padding: 0 2rem;
+}
+
+.sectionDivider {
+  max-width: 320px;
+  margin: 5rem auto;
+}
+
+.sectionTitle {
+  font-family: var(--font-heading);
+  font-size: 1.75rem;
+  color: var(--gold);
+  letter-spacing: 0.1em;
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.sectionSubtitle {
+  font-family: var(--font-body);
+  font-size: 1.15rem;
+  color: var(--ink-muted);
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+/* ── How It Works ── */
+
+.howItWorks {
+  max-width: 560px;
+  width: 100%;
+  opacity: 0;
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+  opacity: 0;
+}
+
+.stepNumber {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  color: var(--gold-dim);
+  line-height: 1;
+  flex-shrink: 0;
+  width: 48px;
+  text-align: center;
+  opacity: 0.6;
+}
+
+.stepContent {
+  flex: 1;
+}
+
+.stepTitle {
+  font-family: var(--font-heading);
+  font-size: 1.15rem;
+  color: var(--gold);
+  margin-bottom: 0.5rem;
+  letter-spacing: 0.05em;
+}
+
+.stepDesc {
+  font-family: var(--font-body);
+  font-size: 1.1rem;
+  color: var(--ink);
+  line-height: 1.65;
+}
+
+.stepConnector {
+  display: flex;
+  justify-content: center;
+  padding-left: 24px;
+  width: 48px;
+  opacity: 0;
+}
+
+.connectorSvg {
+  width: 2px;
+  height: 40px;
+  color: var(--gold-dim);
+  opacity: 0.4;
+}
+
+/* ── Features — alternating rows ── */
+
+.features {
+  max-width: 960px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 5rem;
+}
+
+.featureRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  align-items: center;
+}
+
+.featureRowReverse {
+  direction: rtl;
+}
+
+.featureRowReverse > * {
+  direction: ltr;
+}
+
+.featureVisual {
+  display: flex;
+  justify-content: center;
+}
+
+.featureText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.featureLabel {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--gold-dim);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.featureTitle {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  color: var(--gold);
+  letter-spacing: 0.03em;
+}
+
+.featureDesc {
+  font-family: var(--font-body);
+  font-size: 1.1rem;
+  color: var(--ink);
+  line-height: 1.7;
+}
+
+/* ── Mockup frames ── */
+
+.mockupFrame {
+  width: 100%;
+  max-width: 380px;
+  background: var(--bg-primary);
+  border: 1px solid var(--bg-surface);
+  border-radius: 4px;
+  overflow: hidden;
+  transition: border-color 0.3s ease;
+}
+
+.featureRow:hover .mockupFrame {
+  border-color: var(--gold-dim);
+}
+
+.mockupBar {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--bg-surface);
+}
+
+.mockupDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+}
+
+.mockupBody {
+  padding: 16px;
+  min-height: 160px;
+  display: flex;
+  gap: 12px;
+}
+
+.mockupSidebar {
+  width: 30%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-right: 1px solid var(--bg-surface);
+  padding-right: 12px;
+}
+
+.mockupContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mockupLine {
+  height: 6px;
+  background: var(--bg-surface);
+  border-radius: 2px;
+}
+
+.mockupTreeView {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mockupCategoryLabel {
+  height: 8px;
+  width: 45%;
+  background: var(--gold-dim);
+  border-radius: 2px;
+  opacity: 0.4;
+}
+
+.mockupTreeItem {
+  height: 6px;
+  width: 70%;
+  background: var(--bg-surface);
+  border-radius: 2px;
+  margin-left: 12px;
+}
+
+.mockupGrid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.mockupGridItem {
+  aspect-ratio: 3 / 4;
+  background: var(--bg-surface);
+  border-radius: 2px;
+}
+
+/* ── Final CTA ── */
+
+.finalCta {
+  text-align: center;
+  padding-bottom: 4rem;
+  opacity: 0;
+}
+
+.finalCtaTitle {
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  color: var(--gold);
+  margin-bottom: 1.5rem;
+  letter-spacing: 0.05em;
+}
+
+/* ── Footer ── */
+
+.footer {
+  text-align: center;
+  padding: 2rem;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  position: relative;
+  z-index: 10;
+  border-top: 1px solid var(--bg-surface);
+  margin-top: auto;
+  letter-spacing: 0.03em;
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 900px) {
+  .navbar {
+    padding: 1.5rem 2rem;
+  }
+
+  .title {
+    font-size: 2.5rem;
+  }
+
+  .subtitle {
+    font-size: 1.15rem;
+  }
+
+  .featureRow {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .featureRowReverse {
+    direction: ltr;
+  }
+
+  .featureVisual {
+    order: -1;
+  }
+
+  .howItWorks {
+    max-width: 100%;
+  }
+
+  .features {
+    gap: 3.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .title {
+    font-size: 2rem;
+  }
+
+  .step {
+    gap: 1rem;
+  }
+
+  .stepNumber {
+    font-size: 1.5rem;
+    width: 36px;
+  }
+}

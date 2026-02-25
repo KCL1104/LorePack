@@ -16,8 +16,13 @@ import os
 from typing import Any
 
 import vertexai
+from a2a.types import AgentCapabilities, AgentCard, AgentSkill, TransportProtocol
 from dotenv import load_dotenv
-from vertexai.agent_engines import AdkApp
+from google.adk.a2a.executor.a2a_agent_executor import A2aAgentExecutor
+from google.adk.artifacts import GcsArtifactService, InMemoryArtifactService
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+from vertexai.preview.reasoning_engines import A2aAgent
 
 from app.agent import app as adk_app
 from app.app_utils.telemetry import setup_telemetry
@@ -31,11 +36,89 @@ def _is_integration_test() -> bool:
     return os.getenv("INTEGRATION_TEST", "").lower() in {"1", "true", "yes"}
 
 
-class AgentEngineApp(AdkApp):
-    """LorePack Agent Engine application.
+def _build_agent_card() -> AgentCard:
+    """Build the AgentCard synchronously (no asyncio needed)."""
+    agent = adk_app.root_agent
 
-    Extends AdkApp with feedback collection and telemetry.
-    """
+    agent_card = AgentCard(
+        name=agent.name,
+        description=agent.description or "LorePack collaborative worldbuilding agent",
+        url="http://localhost:9999/",
+        version=os.getenv("AGENT_VERSION", "0.1.0"),
+        capabilities=AgentCapabilities(streaming=False),
+        default_input_modes=["text/plain"],
+        default_output_modes=["text/plain"],
+        supports_authenticated_extended_card=True,
+        preferred_transport=TransportProtocol.http_json,
+        skills=[
+            AgentSkill(
+                id="lorebook_sharing",
+                name="Lorebook Sharing",
+                description=(
+                    "Can export and import worldbuilding lorebooks. "
+                    "Public lorebook entries can be shared with other agents "
+                    "via the A2A protocol for cross-user collaboration."
+                ),
+                tags=["worldbuilding", "lorebook", "sharing", "export", "import"],
+                examples=[
+                    "Share my fantasy lorebook with another user",
+                    "Import a lorebook from another agent",
+                    "List all publicly available lorebooks",
+                ],
+            ),
+            AgentSkill(
+                id="character_crossover",
+                name="Character Crossover",
+                description=(
+                    "Can negotiate character crossover rules between lorebooks. "
+                    "Supports proposing, evaluating, and accepting crossover of "
+                    "characters from one worldbuilding universe into another, "
+                    "with automatic conflict detection."
+                ),
+                tags=["crossover", "character", "negotiation", "collaboration"],
+                examples=[
+                    "Propose a crossover of Aria Stormwind into the sci-fi universe",
+                    "Check if these characters conflict with my existing lore",
+                    "Accept the crossover proposal and merge characters",
+                ],
+            ),
+            AgentSkill(
+                id="story_generation",
+                name="Illustrated Story Generation",
+                description=(
+                    "Can conjure a new story world from genre, era, and protagonist parameters, "
+                    "then generate illustrated chapters grounded in lorebook entries via RAG. "
+                    "Uses Gemini interleaved output for inline scene illustrations. "
+                    "Supports configurable chapter length and writing style."
+                ),
+                tags=["story", "chapter", "generation", "illustration", "RAG", "narrative"],
+                examples=[
+                    "Conjure a dark fantasy world with a warrior protagonist",
+                    "Generate Chapter 2 of the ongoing story",
+                    "Continue the story with an epic battle scene",
+                ],
+            ),
+        ],
+    )
+    return agent_card
+
+
+def _create_runner() -> Runner:
+    """Create a Runner for the A2A executor."""
+    logs_bucket_name = os.environ.get("LOGS_BUCKET_NAME")
+    return Runner(
+        app=adk_app,
+        session_service=InMemorySessionService(),
+        artifact_service=(
+            GcsArtifactService(bucket_name=logs_bucket_name)
+            if logs_bucket_name
+            else InMemoryArtifactService()
+        ),
+    )
+
+
+class AgentEngineApp(A2aAgent):
+    """LorePack Agent Engine application with A2A protocol support."""
 
     def set_up(self) -> None:
         """Initialize the agent engine app with logging and telemetry."""
@@ -72,4 +155,7 @@ class AgentEngineApp(AdkApp):
         return self
 
 
-agent_engine = AgentEngineApp(agent=adk_app.root_agent)
+agent_engine = AgentEngineApp(
+    agent_executor_builder=lambda: A2aAgentExecutor(runner=_create_runner()),
+    agent_card=_build_agent_card(),
+)

@@ -6,6 +6,7 @@ import type {
   SessionDetail,
   ImageAsset,
   Toast,
+  A2AAgent,
 } from '../api/types';
 import {
   listLorebooks,
@@ -13,6 +14,7 @@ import {
   listSessions,
   getSession,
   listImages,
+  listA2AAgents,
 } from '../api/client';
 
 interface AppState {
@@ -31,6 +33,10 @@ interface AppState {
   // Gallery
   images: ImageAsset[];
   fetchImages: (filters?: { asset_type?: string }) => Promise<void>;
+
+  // A2A agents
+  a2aAgents: A2AAgent[];
+  fetchA2AAgents: () => Promise<void>;
 
   // Layout
   sidebarDimmed: boolean;
@@ -79,6 +85,14 @@ export const useAppStore = create<AppState>((set) => ({
   fetchImages: async (filters) => {
     const images = await listImages(filters);
     set({ images });
+  },
+
+  // A2A agents
+  a2aAgents: [],
+
+  fetchA2AAgents: async () => {
+    const a2aAgents = await listA2AAgents();
+    set({ a2aAgents });
   },
 
   // Layout

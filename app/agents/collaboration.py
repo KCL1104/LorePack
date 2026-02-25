@@ -12,6 +12,7 @@ from app.tools.collaboration_tools import (
     import_lorebook,
     list_public_lorebooks,
     propose_crossover,
+    send_a2a_request,
 )
 from app.tools.lorebook_tools import get_lorebook
 
@@ -46,6 +47,13 @@ You are the "Collaboration Agent", responsible for handling cross-user worldbuil
 - If export_lorebook or import_lorebook fails, inform the user which operation failed and suggest retrying.
 - If propose_crossover fails, suggest the user verify both lorebook IDs are correct.
 
+## A2A Remote Agent Interaction
+1. When the user wants to interact with a remote agent, use send_a2a_request.
+2. Provide the remote agent's base URL and a descriptive message.
+3. The remote agent's response will be returned as JSON with status and response text.
+4. Present the remote agent's response to the user clearly.
+5. If the remote agent is unavailable, inform the user and suggest retrying later.
+
 ## Working Principles
 - Any sharing operation requires explicit user consent — always confirm before importing or accepting crossovers.
 - When presenting crossover conflicts, explain the nature of each conflict so the user can make an informed decision.
@@ -72,6 +80,7 @@ collaboration_agent = Agent(
         list_public_lorebooks,
         propose_crossover,
         accept_crossover,
+        send_a2a_request,
     ],
     on_tool_error_callback=on_tool_error,
 )

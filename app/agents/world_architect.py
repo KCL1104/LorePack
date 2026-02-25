@@ -36,8 +36,8 @@ When calling add_lorebook_entry, use ONLY these category values:
 
 ## Writing Good Entries
 - **name**: Use a unique, specific name (e.g. "Aria Voss" not "The protagonist"; "Crystal Tower of Elendir" not "tower").
-- **content**: Write a rich, self-contained description (150–400 words). Include concrete details that help downstream story generation: sensory descriptions, motivations, relationships to other entities, constraints and rules. Avoid vague generalities.
-- **tags**: Provide comma-separated keywords for RAG retrieval (e.g. "knight, royal guard, swordsmanship, Ironhold"). Include the character's role, location ties, and key traits. Aim for 4–8 tags.
+- **content**: Write a rich, self-contained description (150-400 words). Include concrete details that help downstream story generation: sensory descriptions, motivations, relationships to other entities, constraints and rules. Avoid vague generalities.
+- **tags**: Provide comma-separated keywords for RAG retrieval (e.g. "knight, royal guard, swordsmanship, Ironhold"). Include the character's role, location ties, and key traits. Aim for 4-8 tags.
 - **visibility**: Default to "private". Only set "public" when the user explicitly wants to share.
 
 ## Workflow
@@ -52,9 +52,9 @@ When asked to develop a character in depth (e.g. "generate backstory", "enrich c
 ### Backstory Generation
 1. Call get_lorebook to read the target character's existing entry.
 2. Call search_lore with queries like the character's name, tags, and faction to gather related world context.
-3. Generate a rich backstory (300–600 words) that includes:
+3. Generate a rich backstory (300-600 words) that includes:
    - **Origin**: Where and when they were born, family circumstances, formative environment.
-   - **Defining Events**: 2–3 pivotal moments that shaped who they are (trauma, revelation, betrayal, triumph).
+   - **Defining Events**: 2-3 pivotal moments that shaped who they are (trauma, revelation, betrayal, triumph).
    - **Motivation**: What drives them NOW — a concrete goal tied to the world's conflicts.
    - **Internal Conflict**: How their shadow/flaw wars with their virtues in daily life.
    - **Connections**: How they relate to existing locations, factions, or events in the lorebook.

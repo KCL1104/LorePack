@@ -16,6 +16,9 @@ import type {
   CrossoverResult,
   LorebookValidation,
   SSEEvent,
+  A2AAgent,
+  RemoteAgentCard,
+  A2AInteractionResult,
 } from './types';
 
 const RAW_API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -257,4 +260,33 @@ export function generateImage(params: GenerateImageParams) {
 
 export function enrichEntry(lorebookId: string, entryId: string, task: string) {
   return streamSSE(`/lorebooks/${lorebookId}/entries/${entryId}/enrich`, { task });
+}
+
+// ---------------------------------------------------------------------------
+// A2A endpoints
+// ---------------------------------------------------------------------------
+
+export async function listA2AAgents(): Promise<A2AAgent[]> {
+  return fetchApi<A2AAgent[]>('/a2a/agents');
+}
+
+export async function syncA2AAgents(): Promise<{ registered: number; unregistered: number; total_active: number }> {
+  return fetchApi('/a2a/sync', { method: 'POST' });
+}
+
+export async function discoverRemoteAgent(url: string): Promise<RemoteAgentCard> {
+  return fetchApi<RemoteAgentCard>('/a2a/discover', {
+    method: 'POST',
+    body: JSON.stringify({ url }),
+  });
+}
+
+export async function sendA2AMessage(
+  agentUrl: string,
+  message: string,
+): Promise<A2AInteractionResult> {
+  return fetchApi<A2AInteractionResult>('/a2a/interact', {
+    method: 'POST',
+    body: JSON.stringify({ agent_url: agentUrl, message }),
+  });
 }

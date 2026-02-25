@@ -177,6 +177,15 @@ async def update_entry(
 
     entry_ref.update(updates)
 
+    # Auto-register/unregister lorebook agent when visibility changes
+    if "visibility" in updates:
+        try:
+            from app.a2a.registry import get_registry
+
+            get_registry().sync_from_firestore()
+        except Exception:
+            pass  # non-critical — don't block entry update
+
     # Re-embed if content changed
     if "content" in updates or "name" in updates:
         from app.tools.rag_tools import embed_and_store_entry

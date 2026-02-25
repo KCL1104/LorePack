@@ -100,7 +100,7 @@ export default function AuthPage() {
   return (
     <div className={styles.page}>
       <div className={styles.card}>
-        <h1 className={styles.title}>LorePack Sign In</h1>
+        <h1 className={styles.title}>LorePack</h1>
         <p className={styles.subtitle}>Enter the codex and continue your worldbuilding journey.</p>
 
         {!isFirebaseConfigured() ? (

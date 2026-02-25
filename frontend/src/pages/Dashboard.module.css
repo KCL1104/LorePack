@@ -18,6 +18,12 @@
   z-index: 0;
   opacity: 0.52;
   pointer-events: none;
+  animation: particleFadeIn 300ms ease-out both;
+}
+
+@keyframes particleFadeIn {
+  from { opacity: 0; }
+  to { opacity: 0.52; }
 }
 
 .welcome {

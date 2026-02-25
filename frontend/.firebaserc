@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "gemini-hack-487911"
-  }
+  },
+  "targets": {
+    "gemini-hack-487911": {
+      "hosting": {
+        "production": [
+          "gemini-hack-487911"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

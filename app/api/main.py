@@ -9,7 +9,8 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import collaboration, gallery, images, lorebooks, sessions
+from app.a2a.server import mount_a2a_server
+from app.api.routers import a2a_registry, collaboration, gallery, images, lorebooks, sessions
 
 app = FastAPI(
     title="LorePack API",
@@ -34,6 +35,12 @@ app.include_router(gallery.router)
 app.include_router(sessions.router)
 app.include_router(images.router)
 app.include_router(collaboration.router)
+app.include_router(a2a_registry.router)
+app.include_router(a2a_registry.a2a_agent_router)
+
+
+# Mount A2A protocol endpoints (/.well-known/agent-card.json + JSON-RPC POST /)
+mount_a2a_server(app)
 
 
 @app.get("/api/health")

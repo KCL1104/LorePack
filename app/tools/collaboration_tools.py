@@ -289,6 +289,39 @@ def propose_crossover(
     return json.dumps(proposal, ensure_ascii=False, indent=2)
 
 
+def send_a2a_request(remote_agent_url: str, message: str) -> str:
+    """Send a message to a remote A2A agent and return its response.
+
+    Discovers the remote agent's capabilities via its AgentCard, then sends
+    a text message using the A2A protocol's message/send method.
+
+    Args:
+        remote_agent_url: The base URL of the remote agent
+            (e.g. "http://agent.example.com").
+        message: The text message to send to the remote agent.
+
+    Returns:
+        JSON string with the remote agent's response, including status
+        and response text.
+    """
+    import asyncio
+
+    from app.a2a.client import send_to_remote_agent
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        import nest_asyncio
+
+        nest_asyncio.apply()
+        return asyncio.run(send_to_remote_agent(remote_agent_url, message))
+
+    return asyncio.run(send_to_remote_agent(remote_agent_url, message))
+
+
 def accept_crossover(proposal_json: str, requester_uid: str = "") -> str:
     """Accept a crossover proposal and copy character entries into the target lorebook.
 

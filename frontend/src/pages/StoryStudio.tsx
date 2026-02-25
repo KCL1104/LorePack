@@ -298,6 +298,7 @@ export default function StoryStudio() {
   const [loreUpdates, setLoreUpdates] = useState<LoreUpdate[]>([]);
   const [messageDraft, setMessageDraft] = useState('');
 
+  const [stepTransitioning, setStepTransitioning] = useState(false);
   const [contextCollapsed, setContextCollapsed] = useState(false);
   const [worldApproved, setWorldApproved] = useState(true);
   const [worldPreview, setWorldPreview] = useState<{
@@ -373,6 +374,7 @@ export default function StoryStudio() {
     const indicatorAnimation = activeIndicator
       ? animate(activeIndicator, {
         scale: [1, 1.2, 1],
+        boxShadow: ['0 0 0 0 rgba(196, 162, 101, 0)', '0 0 12px 2px rgba(196, 162, 101, 0.5)', '0 0 0 0 rgba(196, 162, 101, 0)'],
         duration: 360,
         ease: 'outQuad',
       })
@@ -566,10 +568,26 @@ export default function StoryStudio() {
   });
 
   const handleBeginTale = async () => {
-    if (!canProceedStep) return;
+    if (!canProceedStep || stepTransitioning) return;
 
     setError(null);
     setStatusText('Preparing conjuration ritual...');
+
+    // Animate conjure panel exit
+    const panelElements = document.querySelectorAll('[data-step-panel], [data-step-item], [data-step-indicator]');
+    if (panelElements.length > 0) {
+      await new Promise<void>((resolve) => {
+        animate(panelElements, {
+          opacity: [1, 0],
+          translateY: [0, -20],
+          delay: stagger(30),
+          duration: 320,
+          ease: 'inQuad',
+          onComplete: () => resolve(),
+        });
+      });
+    }
+
     setPhase('desk');
     setContextCollapsed(false);
     setWorldApproved(false);
@@ -676,8 +694,31 @@ export default function StoryStudio() {
   };
 
   const handleStepChange = (nextStep: number) => {
-    stepDirectionRef.current = nextStep > previousStepRef.current ? 1 : -1;
-    setStepIndex(nextStep);
+    if (nextStep === stepIndex || stepTransitioning) return;
+    const direction = nextStep > previousStepRef.current ? 1 : -1;
+    stepDirectionRef.current = direction;
+    setStepTransitioning(true);
+
+    const cards = document.querySelectorAll('[data-step-item]');
+    const panel = document.querySelector('[data-step-panel]');
+
+    const targets = [...(panel ? [panel] : []), ...Array.from(cards)];
+    if (targets.length > 0) {
+      animate(targets, {
+        opacity: [1, 0],
+        translateX: [0, direction > 0 ? -24 : 24],
+        delay: stagger(30),
+        duration: 200,
+        ease: 'inQuad',
+        onComplete: () => {
+          setStepIndex(nextStep);
+          setStepTransitioning(false);
+        },
+      });
+    } else {
+      setStepIndex(nextStep);
+      setStepTransitioning(false);
+    }
   };
 
   const handleRandomSpark = () => {
@@ -965,7 +1006,7 @@ export default function StoryStudio() {
             <Button
               variant="ghost"
               onClick={() => handleStepChange(Math.max(stepIndex - 1, 0))}
-              disabled={stepIndex === 0 || isGenerating}
+              disabled={stepIndex === 0 || isGenerating || stepTransitioning}
             >
               Back
             </Button>
@@ -973,12 +1014,12 @@ export default function StoryStudio() {
             {stepIndex < STEP_TITLES.length - 1 ? (
               <Button
                 onClick={() => handleStepChange(Math.min(stepIndex + 1, STEP_TITLES.length - 1))}
-                disabled={!canProceedStep || isGenerating}
+                disabled={!canProceedStep || isGenerating || stepTransitioning}
               >
                 Continue
               </Button>
             ) : (
-              <Button onClick={handleBeginTale} disabled={!canProceedStep || isGenerating}>
+              <Button onClick={handleBeginTale} disabled={!canProceedStep || isGenerating || stepTransitioning}>
                 Begin Your Tale
               </Button>
             )}

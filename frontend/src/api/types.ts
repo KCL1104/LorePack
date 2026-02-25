@@ -175,3 +175,37 @@ export interface Toast {
   message: string;
   variant: 'success' | 'error' | 'info';
 }
+
+// A2A types
+
+export interface AgentSkillSummary {
+  id: string;
+  name: string;
+  description: string;
+  tags: string[];
+}
+
+export interface A2AAgent {
+  id: string;
+  name: string;
+  description: string;
+  url: string;
+  lorebook_id: string;
+  skills: AgentSkillSummary[];
+  status: 'active' | 'inactive';
+}
+
+export interface RemoteAgentCard {
+  name: string;
+  description: string;
+  url: string;
+  version: string;
+  skills: AgentSkillSummary[];
+  defaultInputModes: string[];
+  defaultOutputModes: string[];
+}
+
+export interface A2AInteractionResult {
+  status: string;
+  response: string;
+}

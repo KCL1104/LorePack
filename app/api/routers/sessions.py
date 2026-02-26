@@ -85,6 +85,14 @@ GENRE_GUIDE: dict[str, str] = {
         "immortal tribulations, forbidden techniques, sect politics, and the tension between "
         "righteous and demonic paths. Power is earned through discipline, sacrifice, and enlightenment."
     ),
+    "infinite_flow": (
+        "Infinite Flow (無限流) — protagonists are thrust into a succession of deadly, "
+        "genre-shifting trial worlds governed by mysterious rules. Survival depends on "
+        "wit, teamwork, and uncovering the meta-system behind the trials. "
+        "Tone: high-stakes, puzzle-driven, escalating tension. Think death games, "
+        "instance dungeons, point-buy systems, hidden NPCs who are actually players, "
+        "and a grand conspiracy linking every trial. Power is earned through completed scenarios."
+    ),
 }
 
 ESSENCE_GUIDE: dict[str, str] = {
@@ -102,6 +110,12 @@ ARCHETYPE_GUIDE: dict[str, str] = {
     "scholar": "The Scholar — keeper of dangerous and forgotten knowledge. Curiosity is their weapon and their weakness.",
     "trickster": "The Trickster — a smiling force that bends fate sideways. Charm and cunning mask deeper wounds.",
     "outcast": "The Outcast — rejected by the world, chosen by destiny. Their exile becomes their strength.",
+    "healer": "The Healer — bound by oath to mend what others break. Compassion is their strength, but they absorb the pain of everyone they save.",
+    "sovereign": "The Sovereign — born to rule, burdened by the crown. Every decision costs lives, and the throne is the loneliest seat.",
+    "wanderer": "The Wanderer — no home, no roots, only the road ahead. Freedom is their creed, but running from the past catches up eventually.",
+    "artificer": "The Artificer — creator of wonders and terrible machines. Innovation drives them, but their inventions often outpace their wisdom.",
+    "shadow": "The Shadow — moving unseen, striking from darkness. Precision and silence are their art, but isolation is their constant companion.",
+    "rebel": "The Rebel — defying every authority, even destiny itself. Conviction fuels them, but rebellion without purpose becomes destruction.",
 }
 
 SHADOW_GUIDE: dict[str, str] = {
@@ -129,7 +143,7 @@ def _as_iso_string(value: object) -> str:
 
 
 def _build_conjure_prompt(body: "ConjureRequest", session: dict) -> str:
-    """Build a structured, genre-aware conjure prompt from the 4-step wizard selections."""
+    """Build a structured, genre-aware conjure prompt from the wizard selections."""
 
     # --- Step 1: Genre ---
     genre_desc = GENRE_GUIDE.get(
@@ -151,57 +165,94 @@ def _build_conjure_prompt(body: "ConjureRequest", session: dict) -> str:
         else "  - No specific essence specified."
     )
 
-    # --- Step 3: Protagonist ---
-    archetype_desc = ARCHETYPE_GUIDE.get(
-        body.protagonist_archetype,
-        f"Custom archetype: {body.protagonist_archetype}. Create a unique character concept.",
-    )
-    virtues_str = ", ".join(
-        v.replace("_", " ").title() for v in body.protagonist_virtues
-    )
-    shadow_desc = SHADOW_GUIDE.get(
-        body.protagonist_shadow,
-        f"Custom shadow/flaw: {body.protagonist_shadow}.",
-    )
+    # --- Step 3: Protagonists (multi) ---
+    protagonists = body.protagonists
+    if not protagonists and body.protagonist_archetype:
+        # Legacy single-protagonist fallback
+        protagonists = [
+            ProtagonistConfig(
+                archetype=body.protagonist_archetype,
+                virtues=body.protagonist_virtues,
+                shadow=[body.protagonist_shadow] if body.protagonist_shadow else [],
+            )
+        ]
+
+    protagonist_blocks = []
+    for i, p in enumerate(protagonists, 1):
+        archetype_desc = ARCHETYPE_GUIDE.get(
+            p.archetype,
+            f"Custom archetype: {p.archetype}. Create a unique character concept.",
+        )
+        virtues_str = ", ".join(
+            v.replace("_", " ").title() for v in p.virtues
+        )
+        shadow_descs = []
+        for s in p.shadow:
+            sd = SHADOW_GUIDE.get(s, f"Custom shadow/flaw: {s}.")
+            shadow_descs.append(sd)
+        shadows_str = " | ".join(shadow_descs) if shadow_descs else "No shadow specified."
+
+        label = f"Protagonist {i}" if len(protagonists) > 1 else "Protagonist"
+        protagonist_blocks.append(
+            f"### {label}\n"
+            f"Archetype: {archetype_desc}\n"
+            f"Virtues: {virtues_str}\n"
+            f"Shadows: {shadows_str}"
+        )
+
+    protagonists_section = "\n\n".join(protagonist_blocks)
 
     # --- Step 4: Spark ---
     spark_block = f'\n## Step 4 — The Spark\n"{body.spark}"' if body.spark else ""
 
+    # --- Title ---
+    title_block = f'\n## Story Title\n"{body.title}"' if body.title else ""
+
     return (
         f"Conjure a new world for story session {session['id']}.\n"
         f"The associated lorebook ID is {session['lorebook_id']}.\n\n"
+        f"{title_block}\n"
         f"## Step 1 — Genre\n{genre_desc}\n\n"
         f"## Step 2 — World\n"
         f"Era: {era_label}\n"
         f"Essence:\n{essence_block}\n\n"
-        f"## Step 3 — Protagonist\n"
-        f"Archetype: {archetype_desc}\n"
-        f"Virtues: {virtues_str}\n"
-        f"Shadow: {shadow_desc}\n"
+        f"## Step 3 — Protagonists\n"
+        f"{protagonists_section}\n"
         f"{spark_block}\n\n"
         f"## Story Preferences\n"
         f"Chapter length: {body.chapter_length} "
         f"({'~500 words' if body.chapter_length == 'short' else '~1000 words' if body.chapter_length == 'medium' else '~2000 words'})\n"
         f"Writing style: {body.writing_style}\n\n"
         f"## Task\n"
-        f"Create the world, protagonist, and 2\u20133 key locations. "
+        f"Create the world, {'all protagonists' if len(protagonists) > 1 else 'protagonist'}, and 2–3 key locations. "
         f"Record EACH entity as a lorebook entry (lorebook ID: {session['lorebook_id']}). "
         f"Match the tone and themes of the genre throughout. "
         f"When generating chapters, use length='{body.chapter_length}' and style='{body.writing_style}'."
     )
 
-
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 CurrentUser = Annotated[AuthUser, Depends(get_current_user)]
 
 
+class ProtagonistConfig(BaseModel):
+    archetype: str
+    virtues: list[str]
+    shadow: list[str]
+    custom_archetype: str = ""
+    custom_virtues: str = ""
+    custom_shadow: str = ""
+
+
 class ConjureRequest(BaseModel):
+    title: str = ""
     genre: str
     world_era: str
     world_essence: list[str]
-    protagonist_archetype: str
-    protagonist_virtues: list[str]
-    protagonist_shadow: str
+    protagonists: list[ProtagonistConfig] = []
+    # Legacy single-protagonist fields (backward compat)
+    protagonist_archetype: str = ""
+    protagonist_virtues: list[str] = []
+    protagonist_shadow: str = ""
     spark: str = ""
     chapter_length: str = "medium"
     writing_style: str = "literary fiction"
@@ -237,6 +288,7 @@ async def list_sessions(current_user: CurrentUser):
         sessions.append(
             {
                 "id": doc.id,
+                "title": data.get("title", ""),
                 "genre": data.get("genre", ""),
                 "world_era": data.get("world_era", ""),
                 "world_essence": data.get("world_essence", []),
@@ -294,7 +346,78 @@ async def get_session(
     return session
 
 
+@router.delete("/{session_id}")
+async def delete_session(
+    session_id: str,
+    current_user: CurrentUser,
+):
+    """Delete a story session and its associated data."""
+    db = get_firestore_client()
+    session = _require_owned_session(db, session_id, current_user.uid)
+
+    lorebook_id = session.get("lorebook_id", "")
+
+    # Delete chapters
+    if lorebook_id:
+        chapters_ref = (
+            db.collection("stories").document(lorebook_id).collection("chapters")
+        )
+        for ch in chapters_ref.stream():
+            ch.reference.delete()
+        db.collection("stories").document(lorebook_id).delete()
+
+    # Delete session
+    db.collection("story_sessions").document(session_id).delete()
+
+    return {"deleted": session_id}
+
+
 # --- Type B: Agent-powered via SSE ---
+
+
+class SuggestTitlesRequest(BaseModel):
+    genre: str
+    world_era: str
+    protagonists: list[dict] = []
+    spark: str = ""
+
+
+@router.post("/suggest-titles")
+async def suggest_titles(
+    body: SuggestTitlesRequest,
+    current_user: CurrentUser,
+):
+    """Generate AI-suggested story titles based on conjure parameters."""
+    from google import genai
+
+    genre_label = body.genre.replace("_", " ").title()
+    era_label = body.world_era.replace("_", " ").title()
+
+    protagonist_desc = ""
+    for i, p in enumerate(body.protagonists, 1):
+        archetype = p.get("archetype", "unknown").replace("_", " ").title()
+        protagonist_desc += f"  Protagonist {i}: {archetype}\n"
+
+    prompt = (
+        f"Generate exactly 5 creative, evocative story titles for a {genre_label} story "
+        f"set in a {era_label} world.\n"
+        f"{protagonist_desc}"
+        f"{f'Story spark: {body.spark}' if body.spark else ''}\n\n"
+        f"Requirements:\n"
+        f"- Each title should be 2-6 words\n"
+        f"- Titles should feel atmospheric and genre-appropriate\n"
+        f"- Return ONLY the titles, one per line, no numbering or extra text"
+    )
+
+    client = genai.Client(vertexai=True, project="gemini-hack-487911", location="global")
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=prompt,
+    )
+    raw = response.text.strip()
+    titles = [line.strip() for line in raw.split("\n") if line.strip()][:5]
+
+    return {"titles": titles}
 
 
 @router.post("/conjure")
@@ -308,14 +431,29 @@ async def conjure_session(
     from app.api.sse import stream_agent_response
     from app.tools.session_tools import create_session
 
+    # Resolve protagonists
+    protagonists_data = []
+    if body.protagonists:
+        protagonists_data = [
+            {"archetype": p.archetype, "virtues": p.virtues, "shadows": p.shadow}
+            for p in body.protagonists
+        ]
+    elif body.protagonist_archetype:
+        protagonists_data = [
+            {
+                "archetype": body.protagonist_archetype,
+                "virtues": body.protagonist_virtues,
+                "shadows": [body.protagonist_shadow] if body.protagonist_shadow else [],
+            }
+        ]
+
     session = json.loads(
         create_session(
+            title=body.title,
             genre=body.genre,
             world_era=body.world_era,
             world_essence=body.world_essence,
-            protagonist_archetype=body.protagonist_archetype,
-            protagonist_virtues=body.protagonist_virtues,
-            protagonist_shadow=body.protagonist_shadow,
+            protagonists=protagonists_data,
             spark=body.spark,
             owner_uid=current_user.uid,
         )

@@ -20,28 +20,39 @@ def _get_sessions_col():
 def create_session(
     genre: str,
     world_era: str,
-    world_essence: list[str],
-    protagonist_archetype: str,
-    protagonist_virtues: list[str],
-    protagonist_shadow: str,
+    world_essence: list[str] | None = None,
+    protagonists: list[dict] | None = None,
+    protagonist_archetype: str = "",
+    protagonist_virtues: list[str] | None = None,
+    protagonist_shadow: str = "",
     spark: str = "",
     owner_uid: str = "",
+    title: str = "",
 ) -> str:
     """Create a new story session and an associated lorebook.
 
     Args:
-        genre: Genre selection, e.g. "dark_fantasy", "sci_fi", "horror".
+        title: Story title.
+        genre: Genre selection, e.g. "dark_fantasy", "sci_fi", "infinite_flow".
         world_era: World era, e.g. "medieval", "futuristic", "post_apocalyptic".
         world_essence: World essence tags, e.g. ["sword_and_sorcery", "political_intrigue"].
-        protagonist_archetype: Archetype, e.g. "the_outcast", "the_scholar".
-        protagonist_virtues: Virtue tags, e.g. ["cunning", "fearless"].
-        protagonist_shadow: Shadow/flaw, e.g. "grief", "hubris".
+        protagonists: List of protagonist configs, each with archetype, virtues, shadows.
+        protagonist_archetype: Legacy single archetype (backward compat).
+        protagonist_virtues: Legacy single virtues list (backward compat).
+        protagonist_shadow: Legacy single shadow (backward compat).
         spark: Optional story seed text.
 
     Returns:
         JSON string containing the new session details.
     """
     from app.tools.lorebook_tools import create_lorebook
+
+    if world_essence is None:
+        world_essence = []
+    if protagonists is None:
+        protagonists = []
+    if protagonist_virtues is None:
+        protagonist_virtues = []
 
     session_id = str(uuid.uuid4())[:12]
     resolved_owner_uid = resolve_owner_uid(owner_uid)
@@ -50,23 +61,37 @@ def create_session(
     # Auto-create an associated lorebook for this session
     genre_display = genre.replace("_", " ").title()
     era_display = world_era.replace("_", " ").title()
+    lb_title = title if title else f"{genre_display} — {era_display} World"
     lb_result = json.loads(
         create_lorebook(
-            title=f"{genre_display} — {era_display} World",
+            title=lb_title,
             genre=genre.replace("_", " "),
             description=f"Auto-created lorebook for story session {session_id}.",
             owner_uid=resolved_owner_uid,
         )
     )
 
+    # Build protagonists data, with legacy fallback
+    if not protagonists and protagonist_archetype:
+        protagonists = [
+            {
+                "archetype": protagonist_archetype,
+                "virtues": protagonist_virtues,
+                "shadows": [protagonist_shadow] if protagonist_shadow else [],
+            }
+        ]
+
     session = {
         "id": session_id,
+        "title": title,
         "genre": genre,
         "world_era": world_era,
         "world_essence": world_essence,
-        "protagonist_archetype": protagonist_archetype,
-        "protagonist_virtues": protagonist_virtues,
-        "protagonist_shadow": protagonist_shadow,
+        "protagonists": protagonists,
+        # Keep legacy fields for backward compat reads
+        "protagonist_archetype": protagonists[0]["archetype"] if protagonists else protagonist_archetype,
+        "protagonist_virtues": protagonists[0].get("virtues", []) if protagonists else protagonist_virtues,
+        "protagonist_shadow": protagonists[0].get("shadows", [""])[0] if protagonists and protagonists[0].get("shadows") else protagonist_shadow,
         "spark": spark,
         "lorebook_id": lb_result["id"],
         "owner_uid": resolved_owner_uid,

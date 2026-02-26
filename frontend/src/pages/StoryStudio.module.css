@@ -507,6 +507,12 @@
   gap: var(--space-sm);
 }
 
+.sessionRowRight {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
 .sessionRowMeta {
   color: var(--ink-muted);
   font-family: var(--font-mono);

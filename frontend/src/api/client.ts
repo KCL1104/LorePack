@@ -169,6 +169,10 @@ export async function getSession(id: string): Promise<SessionDetail> {
   return fetchApi<SessionDetail>(`/sessions/${id}`);
 }
 
+export async function deleteSession(id: string): Promise<void> {
+  await fetchApi<void>(`/sessions/${id}`, { method: 'DELETE' });
+}
+
 export async function listExampleStories(): Promise<ExampleStorySeed[]> {
   return fetchApi<ExampleStorySeed[]>('/sessions/examples');
 }
@@ -320,6 +324,18 @@ export async function* streamSSE(
       // no-op
     }
   }
+}
+
+export async function suggestTitles(params: {
+  genre: string;
+  world_era: string;
+  protagonists: { archetype: string; virtues: string[]; shadow: string[] }[];
+  spark?: string;
+}): Promise<{ titles: string[] }> {
+  return fetchApi<{ titles: string[] }>('/sessions/suggest-titles', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
 }
 
 export function conjureSession(params: ConjureParams, options?: SSEOptions) {

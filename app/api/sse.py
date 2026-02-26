@@ -144,7 +144,7 @@ async def stream_agent_response(
                         elif tool_name == "generate_chapter":
                             yield sse_event(
                                 "thinking",
-                                {"text": "Generating illustrated chapter..."},
+                                {"text": "Writing chapter text…"},
                             )
                         elif tool_name == "search_lore":
                             yield sse_event(
@@ -193,14 +193,74 @@ async def stream_agent_response(
                                 if isinstance(result_obj, dict)
                                 else str(result_obj)
                             )
-                            for img in _extract_inline_images(raw_result):
-                                yield sse_event(
-                                    "image_generated",
-                                    {
-                                        "gs_uri": img.get("gs_uri", ""),
-                                        "index": img.get("index", 0),
-                                    },
+
+                            # Check for deferred illustration prompts
+                            try:
+                                chapter_data = (
+                                    json.loads(raw_result)
+                                    if isinstance(raw_result, str)
+                                    else raw_result
                                 )
+                            except (json.JSONDecodeError, TypeError):
+                                chapter_data = {}
+
+                            pending_illustrations = []
+                            if isinstance(chapter_data, dict):
+                                for img in chapter_data.get("inline_images", []):
+                                    if img.get("illustration_prompt") and not img.get("gs_uri"):
+                                        pending_illustrations.append(img)
+
+                            if pending_illustrations:
+                                import asyncio
+
+                                from app.tools.story_tools import generate_illustration
+
+                                total = len(pending_illustrations)
+                                lorebook_id = chapter_data.get("lorebook_id", "")
+                                ch_number = chapter_data.get("chapter_number", 1)
+                                ch_title = chapter_data.get("chapter_title", "")
+                                ch_premise = chapter_data.get("premise", "")
+                                ch_owner = chapter_data.get("owner_uid", user_id)
+
+                                for i, img in enumerate(pending_illustrations):
+                                    yield sse_event(
+                                        "thinking",
+                                        {
+                                            "text": f"Generating illustration {i + 1}/{total} via Imagen…"
+                                        },
+                                    )
+                                    result = await asyncio.to_thread(
+                                        generate_illustration,
+                                        illustration_prompt=img["illustration_prompt"],
+                                        lorebook_id=lorebook_id,
+                                        chapter_number=ch_number,
+                                        img_index=img.get("index", i),
+                                        owner_uid=ch_owner,
+                                        chapter_title=ch_title,
+                                        premise=ch_premise,
+                                    )
+                                    if result.get("gs_uri"):
+                                        yield sse_event(
+                                            "image_generated",
+                                            {
+                                                "gs_uri": result["gs_uri"],
+                                                "index": result.get("index", i),
+                                            },
+                                        )
+                                yield sse_event(
+                                    "thinking",
+                                    {"text": "Illustrations complete."},
+                                )
+                            else:
+                                # Legacy: images already generated in tool
+                                for img in _extract_inline_images(raw_result):
+                                    yield sse_event(
+                                        "image_generated",
+                                        {
+                                            "gs_uri": img.get("gs_uri", ""),
+                                            "index": img.get("index", 0),
+                                        },
+                                    )
                         elif fn_name in (
                             "generate_character_image",
                             "generate_scene_image",

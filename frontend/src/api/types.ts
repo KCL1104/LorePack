@@ -65,6 +65,7 @@ export interface ImageDetail extends ImageAsset {
 
 export interface SessionSummary {
   id: string;
+  title: string;
   genre: string;
   world_era: string;
   world_essence: string[];
@@ -94,17 +95,17 @@ export interface Chapter {
 export interface SessionDetail extends SessionSummary {
   protagonist_virtues: string[];
   protagonist_shadow: string;
+  protagonists: { archetype: string; virtues: string[]; shadows: string[] }[];
   spark: string;
   chapters: Chapter[];
 }
 
 export interface ConjureParams {
+  title: string;
   genre: string;
   world_era: string;
   world_essence: string[];
-  protagonist_archetype: string;
-  protagonist_virtues: string[];
-  protagonist_shadow: string;
+  protagonists: { archetype: string; virtues: string[]; shadow: string[] }[];
   spark?: string;
   chapter_length?: string;
   writing_style?: string;

@@ -143,6 +143,141 @@ def _parse_interleaved_response(
     return chapter_title, body, inline_images
 
 
+def _parse_two_step_response(
+    response,
+    lorebook_id: str,
+    chapter_number: int,
+    premise: str,
+    owner_uid: str,
+) -> tuple[str, str, list[dict]]:
+    """Parse a text response with [illustration_prompt:...] markers.
+
+    Extracts illustration prompts but does NOT generate images — that is
+    deferred to the SSE handler so it can yield per-image progress events.
+
+    Returns (chapter_title, body_with_markers, inline_images).
+    inline_images will contain illustration_prompts for deferred generation.
+    """
+    import re
+
+    raw_text = response.text.strip()
+
+    # Extract chapter title from "# ..." line
+    chapter_title = f"Chapter {chapter_number}"
+    lines = raw_text.split("\n")
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("# "):
+            chapter_title = stripped[2:].strip()
+            lines.pop(i)
+            raw_text = "\n".join(lines).strip()
+            break
+
+    # Find all [illustration_prompt: ...] markers
+    pattern = re.compile(r"\[illustration_prompt:\s*(.+?)\]", re.DOTALL)
+    matches = list(pattern.finditer(raw_text))
+
+    # Replace markers with [illustration:N] placeholders and collect prompts
+    illustration_prompts: list[str] = []
+    body = raw_text
+    for img_idx in range(len(matches) - 1, -1, -1):
+        match = matches[img_idx]
+        illustration_prompts.insert(0, match.group(1).strip())
+        body = body[: match.start()] + f"\n\n[illustration:{len(matches) - 1 - img_idx}]\n\n" + body[match.end() :]
+
+    # Fix indices: illustration_prompts[0] → [illustration:0], etc.
+    # (We inserted in reverse, so re-reverse is not needed — the insert(0, ...) already corrected order)
+
+    inline_images: list[dict] = [
+        {
+            "index": idx,
+            "gs_uri": "",
+            "mime_type": "image/png",
+            "illustration_prompt": prompt,
+        }
+        for idx, prompt in enumerate(illustration_prompts)
+    ]
+
+    return chapter_title, body, inline_images
+
+
+def generate_illustration(
+    illustration_prompt: str,
+    lorebook_id: str,
+    chapter_number: int,
+    img_index: int,
+    owner_uid: str,
+    chapter_title: str = "",
+    premise: str = "",
+) -> dict:
+    """Generate a single illustration via Imagen 4.0 and upload to GCS.
+
+    Called by the SSE handler for each illustration prompt so progress
+    events can be yielded between calls.
+
+    Returns dict with gs_uri and metadata.
+    """
+    import time
+
+    from app.tools._firestore import get_imagen_client
+    from app.tools.gcs_tools import upload_image
+
+    imagen_client = get_imagen_client()
+    imagen_model = os.getenv("LOREPACK_IMAGE_MODEL", "imagen-4.0-fast-generate-001")
+    quality_suffix = "high quality, detailed, no text, no watermark, no signature"
+    full_prompt = f"{illustration_prompt}. {quality_suffix}"
+
+    try:
+        img_response = imagen_client.models.generate_images(
+            model=imagen_model,
+            prompt=full_prompt,
+            config=types.GenerateImagesConfig(
+                number_of_images=1,
+                output_mime_type="image/png",
+            ),
+        )
+        image_bytes = img_response.generated_images[0].image.image_bytes
+
+        ts_hex = hex(int(time.time() * 1000))[-8:]
+        gcs_path = (
+            f"stories/{owner_uid}/{lorebook_id}"
+            f"/ch{chapter_number}_{img_index}_{ts_hex}.png"
+        )
+        gs_uri = upload_image(image_bytes, gcs_path)
+
+        # Persist to gallery
+        now = datetime.now(UTC).isoformat()
+        _get_db().collection("image_assets").add(
+            {
+                "status": "success",
+                "asset_type": "scene",
+                "scene_name": (
+                    f"{chapter_title or f'Chapter {chapter_number}'}"
+                    f" — Illustration {img_index + 1}"
+                ),
+                "prompt_used": full_prompt,
+                "gs_uri": gs_uri,
+                "lorebook_id": lorebook_id,
+                "owner_uid": owner_uid,
+                "art_style": "imagen",
+                "generated_at": now,
+            }
+        )
+
+        return {
+            "index": img_index,
+            "gs_uri": gs_uri,
+            "mime_type": "image/png",
+        }
+    except Exception:
+        return {
+            "index": img_index,
+            "gs_uri": "",
+            "mime_type": "image/png",
+            "error": "Image generation failed",
+        }
+
+
 def _parse_text_only_response(
     response,
     chapter_number: int,
@@ -272,12 +407,14 @@ def generate_chapter(
         }
     word_count = length_map.get(length, length_map["medium"])
 
-    # Step 3: Call Gemini — interleaved text+image in production, text-only in tests
-    use_interleaved = not _is_test_mode()
+    # Step 3: Call Gemini for text + illustration prompts (two-step approach)
+    # Step 3a: Generate chapter text with illustration prompt descriptions
+    # Step 3b: Generate actual images via Imagen 4.0 for higher quality
+    use_illustrations = not _is_test_mode()
 
-    if use_interleaved:
+    if use_illustrations:
         prompt = (
-            f"You are a master storyteller and illustrator creating "
+            f"You are a master storyteller creating "
             f'Chapter {chapter_number} of a story set in "{world_title}".\n'
             f"World description: {world_desc}\n\n"
             f"## World-Building Reference (from Lorebook)\n{lore_context}\n\n"
@@ -288,15 +425,19 @@ def generate_chapter(
             f"- Stay strictly consistent with the world-building reference above.\n"
             f"- Bring characters to life with dialogue and inner thoughts.\n"
             f"- End the chapter with a hook that makes the reader want to continue.\n"
-            f'- Start your response with "# " followed by a compelling chapter title.\n'
-            f"- Generate 1-2 vivid scene illustrations at key dramatic moments.\n"
-            f"  Place images naturally between paragraphs at impactful story beats.\n"
-            f"- Illustrations must NOT contain any text, watermarks, or signatures.\n"
+            f'- Start your response with "# " followed by a compelling chapter title.\n\n'
+            f"## Illustration Markers\n"
+            f"- Insert 1-2 illustration markers at key dramatic moments.\n"
+            f"- Use this exact format: [illustration_prompt: <detailed visual description>]\n"
+            f"- The description should be a vivid, self-contained image generation prompt "
+            f"(scene composition, lighting, atmosphere, characters present, art style).\n"
+            f"- Place markers naturally between paragraphs at impactful story beats.\n"
+            f'- Example: [illustration_prompt: A lone warrior standing on a cliff edge at sunset, '
+            f'overlooking a vast burning city below, dramatic backlighting, epic fantasy concept art]\n'
         )
         config = types.GenerateContentConfig(
             temperature=0.85,
             max_output_tokens=_story_max_output_tokens(),
-            response_modalities=["TEXT", "IMAGE"],
             thinking_config=types.ThinkingConfig(
                 thinking_level=types.ThinkingLevel.LOW,
             ),
@@ -336,9 +477,9 @@ def generate_chapter(
         config=config,
     )
 
-    # Step 4: Parse response
-    if use_interleaved:
-        chapter_title, body, inline_images = _parse_interleaved_response(
+    # Step 4: Parse response and generate illustrations via Imagen
+    if use_illustrations:
+        chapter_title, body, inline_images = _parse_two_step_response(
             response,
             lorebook_id=lorebook_id,
             chapter_number=chapter_number,

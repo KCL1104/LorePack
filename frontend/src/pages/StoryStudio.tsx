@@ -6,9 +6,11 @@ import type { ShaderMaterial } from 'three';
 
 import {
   conjureSession,
+  deleteSession,
   getSession as fetchSessionDetail,
   listExampleStories,
   sendMessage,
+  suggestTitles,
   type ConjureParams,
   type ExampleStorySeed,
   type SSEEvent,
@@ -25,19 +27,24 @@ interface SelectOption {
   description?: string;
 }
 
+interface ProtagonistForm {
+  archetype: string;
+  customArchetype: string;
+  virtues: string[];
+  customVirtues: string;
+  shadows: string[];
+  customShadow: string;
+}
+
 interface ConjureForm {
+  title: string;
   genre: string;
   customGenre: string;
   worldEra: string;
   customWorldEra: string;
   worldEssence: string[];
   customWorldEssence: string;
-  protagonistArchetype: string;
-  customProtagonistArchetype: string;
-  protagonistVirtues: string[];
-  customProtagonistVirtues: string;
-  protagonistShadow: string;
-  customProtagonistShadow: string;
+  protagonists: ProtagonistForm[];
   spark: string;
   chapterLength: string;
   writingStyle: string;
@@ -72,8 +79,9 @@ interface LoreUpdate {
 const STEP_TITLES = [
   'Choose Your Realm',
   'Shape the World',
-  'Forge Your Protagonist',
+  'Forge Your Protagonists',
   'The Spark',
+  'Name Your Tale',
 ];
 
 const GENRES: SelectOption[] = [
@@ -87,6 +95,7 @@ const GENRES: SelectOption[] = [
   { id: 'alternate_history', label: 'Alternate History', description: 'History took a different turn. No magic — just a world that never was.' },
   { id: 'urban_fantasy', label: 'Urban Fantasy', description: 'Modern cities with supernatural undercurrents.' },
   { id: 'wuxia_xianxia', label: 'Wuxia / Xianxia', description: 'Martial arts, spiritual cultivation, heaven-defying heroes.' },
+  { id: 'infinite_flow', label: 'Infinite Flow (無限流)', description: 'Deadly trial worlds, survival games, mysterious rule systems.' },
   { id: 'custom', label: 'Custom', description: 'Forge your own path...' },
 ];
 
@@ -117,6 +126,12 @@ const ARCHETYPES: SelectOption[] = [
   { id: 'scholar', label: 'The Scholar', description: 'Keeper of dangerous and forgotten knowledge.' },
   { id: 'trickster', label: 'The Trickster', description: 'A smiling force that bends fate sideways.' },
   { id: 'outcast', label: 'The Outcast', description: 'Rejected by the world, chosen by destiny.' },
+  { id: 'healer', label: 'The Healer', description: 'Bound by oath to mend what others break.' },
+  { id: 'sovereign', label: 'The Sovereign', description: 'Born to rule, burdened by the crown.' },
+  { id: 'wanderer', label: 'The Wanderer', description: 'No home, no roots, only the road ahead.' },
+  { id: 'artificer', label: 'The Artificer', description: 'Creator of wonders and terrible machines.' },
+  { id: 'shadow', label: 'The Shadow', description: 'Moving unseen, striking from darkness.' },
+  { id: 'rebel', label: 'The Rebel', description: 'Defying every authority, even destiny itself.' },
   { id: 'custom', label: 'Custom', description: 'A unique soul, defying fate and classification.' },
 ];
 
@@ -167,19 +182,24 @@ const DEFAULT_SPARKS = [
   'A forgotten god asks the protagonist for sanctuary in exchange for a single miracle.',
 ];
 
+const EMPTY_PROTAGONIST: ProtagonistForm = {
+  archetype: '',
+  customArchetype: '',
+  virtues: [],
+  customVirtues: '',
+  shadows: [],
+  customShadow: '',
+};
+
 const INITIAL_FORM: ConjureForm = {
+  title: '',
   genre: '',
   customGenre: '',
   worldEra: '',
   customWorldEra: '',
   worldEssence: [],
   customWorldEssence: '',
-  protagonistArchetype: '',
-  customProtagonistArchetype: '',
-  protagonistVirtues: [],
-  customProtagonistVirtues: '',
-  protagonistShadow: '',
-  customProtagonistShadow: '',
+  protagonists: [{ ...EMPTY_PROTAGONIST }],
   spark: '',
   chapterLength: 'medium',
   writingStyle: 'literary_fiction',
@@ -321,12 +341,13 @@ export default function StoryStudio() {
     images: ChapterImage[];
   } | null>(null);
   const [loadingSession, setLoadingSession] = useState(false);
+  const [suggestedTitles, setSuggestedTitles] = useState<string[]>([]);
+  const [suggestingTitles, setSuggestingTitles] = useState(false);
 
   const stepDirectionRef = useRef(1);
   const previousStepRef = useRef(0);
   const idCounterRef = useRef(0);
   const autoResumeAttempted = useRef(false);
-  const sessionListRef = useRef<HTMLDivElement>(null);
 
   const sessions = useAppStore((state) => state.sessions);
   const fetchSessions = useAppStore((state) => state.fetchSessions);
@@ -389,11 +410,19 @@ export default function StoryStudio() {
       // Populate form context from session data
       setForm((prev) => ({
         ...prev,
+        title: (detail as any).title || prev.title,
         genre: detail.genre || prev.genre,
         worldEra: detail.world_era || prev.worldEra,
-        protagonistArchetype: detail.protagonist_archetype || prev.protagonistArchetype,
-        protagonistShadow: detail.protagonist_shadow || prev.protagonistShadow,
-        protagonistVirtues: detail.protagonist_virtues?.length ? detail.protagonist_virtues : prev.protagonistVirtues,
+        protagonists: (detail as any).protagonists?.length
+          ? (detail as any).protagonists.map((p: any) => ({
+              archetype: p.archetype || '',
+              customArchetype: '',
+              virtues: p.virtues || [],
+              customVirtues: '',
+              shadows: p.shadows || [],
+              customShadow: '',
+            }))
+          : prev.protagonists,
       }));
 
       // Load chapters from backend
@@ -436,11 +465,14 @@ export default function StoryStudio() {
       return eraValid && essenceValid;
     }
     if (stepIndex === 2) {
-      const archetypeValid = Boolean(form.protagonistArchetype) && (form.protagonistArchetype !== 'custom' || Boolean(form.customProtagonistArchetype.trim()));
-      const virtuesValid = form.protagonistVirtues.length > 0 && (!form.protagonistVirtues.includes('custom') || Boolean(form.customProtagonistVirtues.trim()));
-      const shadowValid = Boolean(form.protagonistShadow) && (form.protagonistShadow !== 'custom' || Boolean(form.customProtagonistShadow.trim()));
-      return archetypeValid && virtuesValid && shadowValid;
+      return form.protagonists.length > 0 && form.protagonists.every((p) => {
+        const archetypeValid = Boolean(p.archetype) && (p.archetype !== 'custom' || Boolean(p.customArchetype.trim()));
+        const virtuesValid = p.virtues.length > 0 && (!p.virtues.includes('custom') || Boolean(p.customVirtues.trim()));
+        const shadowValid = p.shadows.length > 0 && (!p.shadows.includes('custom') || Boolean(p.customShadow.trim()));
+        return archetypeValid && virtuesValid && shadowValid;
+      });
     }
+    if (stepIndex === 4) return true;
     return true;
   }, [form, stepIndex]);
 
@@ -538,6 +570,31 @@ export default function StoryStudio() {
 
   const updateForm = <K extends keyof ConjureForm>(key: K, value: ConjureForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateProtagonist = (index: number, updates: Partial<ProtagonistForm>) => {
+    setForm((prev) => ({
+      ...prev,
+      protagonists: prev.protagonists.map((p, i) =>
+        i === index ? { ...p, ...updates } : p,
+      ),
+    }));
+  };
+
+  const addProtagonist = () => {
+    if (form.protagonists.length >= 3) return;
+    setForm((prev) => ({
+      ...prev,
+      protagonists: [...prev.protagonists, { ...EMPTY_PROTAGONIST }],
+    }));
+  };
+
+  const removeProtagonist = (index: number) => {
+    if (form.protagonists.length <= 1) return;
+    setForm((prev) => ({
+      ...prev,
+      protagonists: prev.protagonists.filter((_, i) => i !== index),
+    }));
   };
 
   const toggleMultiValue = (
@@ -689,12 +746,15 @@ export default function StoryStudio() {
   };
 
   const getConjurePayload = (): ConjureParams => ({
+    title: form.title.trim(),
     genre: resolveCustomSingle(form.genre, form.customGenre),
     world_era: resolveCustomSingle(form.worldEra, form.customWorldEra),
     world_essence: resolveCustomMulti(form.worldEssence, form.customWorldEssence),
-    protagonist_archetype: resolveCustomSingle(form.protagonistArchetype, form.customProtagonistArchetype),
-    protagonist_virtues: resolveCustomMulti(form.protagonistVirtues, form.customProtagonistVirtues),
-    protagonist_shadow: resolveCustomSingle(form.protagonistShadow, form.customProtagonistShadow),
+    protagonists: form.protagonists.map((p) => ({
+      archetype: resolveCustomSingle(p.archetype, p.customArchetype),
+      virtues: resolveCustomMulti(p.virtues, p.customVirtues),
+      shadow: resolveCustomMulti(p.shadows, p.customShadow),
+    })),
     spark: form.spark.trim() || undefined,
     chapter_length: form.chapterLength,
     writing_style: form.writingStyle.replace(/_/g, ' '),
@@ -865,12 +925,14 @@ export default function StoryStudio() {
         customWorldEra: '',
         worldEssence: [...seed.world_essence],
         customWorldEssence: '',
-        protagonistArchetype: seed.protagonist_archetype,
-        customProtagonistArchetype: '',
-        protagonistVirtues: [...seed.protagonist_virtues],
-        customProtagonistVirtues: '',
-        protagonistShadow: seed.protagonist_shadow,
-        customProtagonistShadow: '',
+        protagonists: [{
+          archetype: seed.protagonist_archetype,
+          customArchetype: '',
+          virtues: [...seed.protagonist_virtues],
+          customVirtues: '',
+          shadows: [seed.protagonist_shadow],
+          customShadow: '',
+        }],
         spark: seed.spark,
         chapterLength: seed.chapter_length,
         writingStyle: seed.writing_style,
@@ -881,6 +943,39 @@ export default function StoryStudio() {
 
     const index = Math.floor(Math.random() * DEFAULT_SPARKS.length);
     updateForm('spark', DEFAULT_SPARKS[index]);
+  };
+
+  const handleSuggestTitles = async () => {
+    setSuggestingTitles(true);
+    try {
+      const result = await suggestTitles({
+        genre: resolveCustomSingle(form.genre, form.customGenre),
+        world_era: resolveCustomSingle(form.worldEra, form.customWorldEra),
+        protagonists: form.protagonists.map((p) => ({
+          archetype: resolveCustomSingle(p.archetype, p.customArchetype),
+          virtues: resolveCustomMulti(p.virtues, p.customVirtues),
+          shadow: resolveCustomMulti(p.shadows, p.customShadow),
+        })),
+        spark: form.spark.trim() || undefined,
+      });
+      setSuggestedTitles(result.titles);
+    } catch {
+      addToast({ variant: 'error', message: 'Failed to generate title suggestions.' });
+    } finally {
+      setSuggestingTitles(false);
+    }
+  };
+
+  const handleDeleteSession = async (sid: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!confirm(t('Are you sure you want to delete this story? This cannot be undone.'))) return;
+    try {
+      await deleteSession(sid);
+      await fetchSessions();
+      addToast({ variant: 'success', message: t('Story deleted.') });
+    } catch {
+      addToast({ variant: 'error', message: t('Failed to delete story.') });
+    }
   };
 
   const renderConjureStep = () => {
@@ -973,90 +1068,107 @@ export default function StoryStudio() {
     if (stepIndex === 2) {
       return (
         <div className={styles.stepSplit}>
-          <div>
-            <p className={styles.blockLabel}>Archetype</p>
-            <div className={styles.optionGridLarge}>
-              {ARCHETYPES.map((archetype) => (
-                <Card
-                  key={archetype.id}
-                  className={`${styles.optionCard}${form.protagonistArchetype === archetype.id ? ` ${styles.optionCardSelected}` : ''}`}
-                  onClick={() => updateForm('protagonistArchetype', archetype.id)}
-                  data-step-item
-                >
-                  <h3 className={styles.optionTitle}>{archetype.label}</h3>
-                  <p className={styles.optionDescription}>{archetype.description}</p>
-                </Card>
-              ))}
-            </div>
-            {form.protagonistArchetype === 'custom' && (
-              <div style={{ marginTop: 'var(--space-md)' }}>
-                <Input
-                  value={form.customProtagonistArchetype}
-                  onChange={(event) => updateForm('customProtagonistArchetype', event.target.value)}
-                  placeholder="Describe your custom archetype..."
-                  autoFocus
-                />
+          {form.protagonists.map((protagonist, pIdx) => (
+            <div key={pIdx} style={{ marginBottom: 'var(--space-xl)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-md)' }}>
+                <p className={styles.blockLabel}>
+                  {form.protagonists.length > 1 ? `Protagonist ${pIdx + 1}` : 'Protagonist'}
+                </p>
+                {form.protagonists.length > 1 && (
+                  <Button variant="ghost" onClick={() => removeProtagonist(pIdx)}>
+                    Remove
+                  </Button>
+                )}
               </div>
-            )}
-          </div>
 
-          <div>
-            <p className={styles.blockLabel}>Virtues (up to 3)</p>
-            <div className={styles.tagRow}>
-              {VIRTUES.map((virtue) => (
-                <Tag
-                  key={virtue.id}
-                  label={virtue.label}
-                  selected={form.protagonistVirtues.includes(virtue.id)}
-                  onClick={() =>
-                    updateForm(
-                      'protagonistVirtues',
-                      toggleMultiValue(form.protagonistVirtues, virtue.id, 3),
-                    )
-                  }
-                />
-              ))}
-            </div>
-            {form.protagonistVirtues.includes('custom') && (
-              <div style={{ marginTop: 'var(--space-md)', marginBottom: 'var(--space-lg)' }}>
-                <Input
-                  value={form.customProtagonistVirtues}
-                  onChange={(event) => updateForm('customProtagonistVirtues', event.target.value)}
-                  placeholder="Describe a custom virtue..."
-                  autoFocus
-                />
+              <p className={styles.blockLabel}>Archetype</p>
+              <div className={styles.optionGridLarge}>
+                {ARCHETYPES.map((archetype) => (
+                  <Card
+                    key={archetype.id}
+                    className={`${styles.optionCard}${protagonist.archetype === archetype.id ? ` ${styles.optionCardSelected}` : ''}`}
+                    onClick={() => updateProtagonist(pIdx, { archetype: archetype.id })}
+                    data-step-item
+                  >
+                    <h3 className={styles.optionTitle}>{archetype.label}</h3>
+                    <p className={styles.optionDescription}>{archetype.description}</p>
+                  </Card>
+                ))}
               </div>
-            )}
+              {protagonist.archetype === 'custom' && (
+                <div style={{ marginTop: 'var(--space-md)' }}>
+                  <Input
+                    value={protagonist.customArchetype}
+                    onChange={(event) => updateProtagonist(pIdx, { customArchetype: event.target.value })}
+                    placeholder="Describe your custom archetype..."
+                  />
+                </div>
+              )}
 
-            <p className={styles.blockLabel}>Shadow (single-select)</p>
-            <div className={styles.tagRow}>
-              {SHADOWS.map((shadow) => (
-                <Tag
-                  key={shadow.id}
-                  label={shadow.label}
-                  variant="crimson"
-                  selected={form.protagonistShadow === shadow.id}
-                  onClick={() => updateForm('protagonistShadow', shadow.id)}
-                />
-              ))}
-            </div>
-            {form.protagonistShadow === 'custom' && (
-              <div style={{ marginTop: 'var(--space-md)' }}>
-                <Input
-                  value={form.customProtagonistShadow}
-                  onChange={(event) => updateForm('customProtagonistShadow', event.target.value)}
-                  placeholder="Describe a custom shadow..."
-                  autoFocus
-                />
+              <p className={styles.blockLabel}>Virtues (up to 3)</p>
+              <div className={styles.tagRow}>
+                {VIRTUES.map((virtue) => (
+                  <Tag
+                    key={virtue.id}
+                    label={virtue.label}
+                    selected={protagonist.virtues.includes(virtue.id)}
+                    onClick={() =>
+                      updateProtagonist(pIdx, {
+                        virtues: toggleMultiValue(protagonist.virtues, virtue.id, 3),
+                      })
+                    }
+                  />
+                ))}
               </div>
-            )}
-          </div>
+              {protagonist.virtues.includes('custom') && (
+                <div style={{ marginTop: 'var(--space-md)', marginBottom: 'var(--space-lg)' }}>
+                  <Input
+                    value={protagonist.customVirtues}
+                    onChange={(event) => updateProtagonist(pIdx, { customVirtues: event.target.value })}
+                    placeholder="Describe a custom virtue..."
+                  />
+                </div>
+              )}
+
+              <p className={styles.blockLabel}>Shadows (up to 3)</p>
+              <div className={styles.tagRow}>
+                {SHADOWS.map((shadow) => (
+                  <Tag
+                    key={shadow.id}
+                    label={shadow.label}
+                    variant="crimson"
+                    selected={protagonist.shadows.includes(shadow.id)}
+                    onClick={() =>
+                      updateProtagonist(pIdx, {
+                        shadows: toggleMultiValue(protagonist.shadows, shadow.id, 3),
+                      })
+                    }
+                  />
+                ))}
+              </div>
+              {protagonist.shadows.includes('custom') && (
+                <div style={{ marginTop: 'var(--space-md)' }}>
+                  <Input
+                    value={protagonist.customShadow}
+                    onChange={(event) => updateProtagonist(pIdx, { customShadow: event.target.value })}
+                    placeholder="Describe a custom shadow..."
+                  />
+                </div>
+              )}
+            </div>
+          ))}
+
+          {form.protagonists.length < 3 && (
+            <Button variant="ghost" onClick={addProtagonist}>
+              + Add Another Protagonist (up to 3)
+            </Button>
+          )}
         </div>
       );
     }
 
-    return (
-      <div className={styles.stepSplit}>
+    if (stepIndex === 3) {
+      return (
         <div>
           <p className={styles.blockLabel}>Story Spark</p>
           <Input
@@ -1097,16 +1209,53 @@ export default function StoryStudio() {
             ))}
           </div>
         </div>
+      );
+    }
+
+    // stepIndex === 4: Name Your Tale
+    return (
+      <div className={styles.stepSplit}>
+        <div>
+          <p className={styles.blockLabel}>Story Title</p>
+          <Input
+            value={form.title}
+            onChange={(event) => updateForm('title', event.target.value)}
+            placeholder="Give your story a name..."
+          />
+
+          <div className={styles.sparkActions}>
+            <Button variant="ghost" onClick={handleSuggestTitles} disabled={suggestingTitles}>
+              {suggestingTitles ? 'Generating...' : '✦ AI Suggestions'}
+            </Button>
+          </div>
+
+          {suggestedTitles.length > 0 && (
+            <div className={styles.tagRow} style={{ marginTop: 'var(--space-md)' }}>
+              {suggestedTitles.map((title) => (
+                <Tag
+                  key={title}
+                  label={title}
+                  selected={form.title === title}
+                  onClick={() => updateForm('title', title)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
 
         <Card hoverable={false} className={styles.summaryCard}>
           <p className={styles.blockLabel}>Conjuration Summary</p>
           <ul className={styles.summaryList}>
+            {form.title ? <li><strong>Title:</strong> {form.title}</li> : null}
             <li><strong>Genre:</strong> {formatLabel(form.genre)} {form.genre === 'custom' && form.customGenre ? `(${form.customGenre})` : ''}</li>
             <li><strong>Era:</strong> {formatLabel(form.worldEra)} {form.worldEra === 'custom' && form.customWorldEra ? `(${form.customWorldEra})` : ''}</li>
-            <li><strong>Essence:</strong> {form.worldEssence.map(formatLabel).join(', ') || 'Unset'} {form.worldEssence.includes('custom') && form.customWorldEssence ? `(${form.customWorldEssence})` : ''}</li>
-            <li><strong>Archetype:</strong> {formatLabel(form.protagonistArchetype)} {form.protagonistArchetype === 'custom' && form.customProtagonistArchetype ? `(${form.customProtagonistArchetype})` : ''}</li>
-            <li><strong>Virtues:</strong> {form.protagonistVirtues.map(formatLabel).join(', ') || 'Unset'} {form.protagonistVirtues.includes('custom') && form.customProtagonistVirtues ? `(${form.customProtagonistVirtues})` : ''}</li>
-            <li><strong>Shadow:</strong> {formatLabel(form.protagonistShadow)} {form.protagonistShadow === 'custom' && form.customProtagonistShadow ? `(${form.customProtagonistShadow})` : ''}</li>
+            <li><strong>Essence:</strong> {form.worldEssence.map(formatLabel).join(', ') || 'Unset'}</li>
+            {form.protagonists.map((p, i) => (
+              <li key={i}>
+                <strong>{form.protagonists.length > 1 ? `Protagonist ${i + 1}:` : 'Protagonist:'}</strong>{' '}
+                {formatLabel(p.archetype)} · Virtues: {p.virtues.map(formatLabel).join(', ') || 'Unset'} · Shadows: {p.shadows.map(formatLabel).join(', ') || 'Unset'}
+              </li>
+            ))}
             <li><strong>Length:</strong> {formatLabel(form.chapterLength)}</li>
             <li><strong>Style:</strong> {formatLabel(form.writingStyle)}</li>
           </ul>
@@ -1180,18 +1329,10 @@ export default function StoryStudio() {
                     {t('Conjure a fresh world with genre, era, protagonist, and spark.')}
                   </p>
                 </Card>
-
-                <Card className={styles.selectCard} onClick={() => sessionListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}>
-                  <span className={styles.selectIcon}>↻</span>
-                  <h3 className={styles.selectCardTitle}>{t('Continue an Existing Tale')}</h3>
-                  <p className={styles.selectCardDesc}>
-                    {t('Resume a previous story session and keep writing.')}
-                  </p>
-                </Card>
               </div>
 
               {sessions.length > 0 ? (
-                <div ref={sessionListRef} className={styles.sessionList}>
+                <div className={styles.sessionList}>
                   <SectionHeader title={t('Your Stories')} />
                   {sessions.map((s) => (
                     <Card
@@ -1200,13 +1341,22 @@ export default function StoryStudio() {
                       onClick={() => { void handleResumeSession(s.id); }}
                     >
                       <div className={styles.sessionRowLeft}>
+                        {s.title ? <span style={{ fontWeight: 600, marginRight: 'var(--space-sm)' }}>{s.title}</span> : null}
                         <Tag label={formatLabel(s.genre)} selected />
                         <Tag label={formatLabel(s.world_era)} />
                         <Tag label={formatLabel(s.status)} />
                       </div>
-                      <p className={styles.sessionRowMeta}>
-                        {s.updated_at ? new Date(s.updated_at).toLocaleDateString(dateLocale) : t('Unknown')}
-                      </p>
+                      <div className={styles.sessionRowRight}>
+                        <p className={styles.sessionRowMeta}>
+                          {s.updated_at ? new Date(s.updated_at).toLocaleDateString(dateLocale) : t('Unknown')}
+                        </p>
+                        <Button
+                          variant="ghost"
+                          onClick={(e) => { void handleDeleteSession(s.id, e); }}
+                        >
+                          ✕
+                        </Button>
+                      </div>
                     </Card>
                   ))}
                 </div>
@@ -1248,7 +1398,7 @@ export default function StoryStudio() {
           </div>
 
           <Card hoverable={false} className={styles.stepCard}>
-            <SectionHeader title={`Step ${stepIndex + 1}/4 — ${STEP_TITLES[stepIndex]}`} />
+            <SectionHeader title={`Step ${stepIndex + 1}/${STEP_TITLES.length} — ${STEP_TITLES[stepIndex]}`} />
             {renderConjureStep()}
           </Card>
 
@@ -1296,8 +1446,9 @@ export default function StoryStudio() {
               <div className={styles.contextContent}>
                 <Tag label={formatLabel(form.genre)} selected />
                 <Tag label={formatLabel(form.worldEra)} selected />
-                <Tag label={formatLabel(form.protagonistArchetype)} selected />
-                <Tag label={formatLabel(form.protagonistShadow)} variant="crimson" selected />
+                {form.protagonists.map((p, i) => (
+                  <Tag key={i} label={formatLabel(p.archetype)} selected />
+                ))}
                 <p className={styles.contextMeta}>
                   Session: {sessionId || 'pending'} · Lorebook: {lorebookId || 'pending'}
                 </p>

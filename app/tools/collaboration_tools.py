@@ -71,8 +71,8 @@ def export_lorebook(lorebook_id: str, requester_uid: str = "") -> str:
         )
 
     package = {
-        "id": lorebook["id"],
-        "title": lorebook["title"],
+        "id": lorebook.get("id", lorebook_id),
+        "title": lorebook.get("title", "Untitled lorebook"),
         "genre": lorebook.get("genre", ""),
         "description": lorebook.get("description", ""),
         "source_owner_uid": source_owner_uid,
@@ -164,7 +164,7 @@ def list_public_lorebooks(requester_uid: str = "") -> str:
         if resolved_requester_uid and owner_uid == resolved_requester_uid:
             continue
 
-        lb_id = lb["id"]
+        lb_id = lb.get("id", lb_snap.id)
         entries_ref = _get_lorebooks_col().document(lb_id).collection("entries")
         public_count = sum(
             1 for e in entries_ref.stream() if e.to_dict().get("visibility") == "public"
@@ -173,7 +173,7 @@ def list_public_lorebooks(requester_uid: str = "") -> str:
             results.append(
                 {
                     "id": lb_id,
-                    "title": lb["title"],
+                    "title": lb.get("title", "Untitled lorebook"),
                     "genre": lb.get("genre", ""),
                     "description": lb.get("description", ""),
                     "public_entry_count": public_count,

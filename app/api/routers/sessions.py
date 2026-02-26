@@ -116,6 +116,18 @@ SHADOW_GUIDE: dict[str, str] = {
 }
 
 
+def _as_iso_string(value: object) -> str:
+    """Normalize Firestore timestamp-like values into ISO strings."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    isoformat = getattr(value, "isoformat", None)
+    if callable(isoformat):
+        return isoformat()
+    return str(value)
+
+
 def _build_conjure_prompt(body: "ConjureRequest", session: dict) -> str:
     """Build a structured, genre-aware conjure prompt from the 4-step wizard selections."""
 
@@ -220,6 +232,8 @@ async def list_sessions(current_user: CurrentUser):
     query = db.collection("story_sessions").where("owner_uid", "==", current_user.uid)
     for doc in query.stream():
         data = doc.to_dict()
+        created_at = _as_iso_string(data.get("created_at", ""))
+        updated_at = _as_iso_string(data.get("updated_at", ""))
         sessions.append(
             {
                 "id": doc.id,
@@ -229,8 +243,8 @@ async def list_sessions(current_user: CurrentUser):
                 "protagonist_archetype": data.get("protagonist_archetype", ""),
                 "status": data.get("status", ""),
                 "lorebook_id": data.get("lorebook_id", ""),
-                "created_at": data.get("created_at", ""),
-                "updated_at": data.get("updated_at", ""),
+                "created_at": created_at,
+                "updated_at": updated_at,
             }
         )
     sessions.sort(key=lambda x: x.get("updated_at", ""), reverse=True)

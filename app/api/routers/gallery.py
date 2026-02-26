@@ -11,6 +11,18 @@ router = APIRouter(prefix="/api/gallery", tags=["gallery"])
 CurrentUser = Annotated[AuthUser, Depends(get_current_user)]
 
 
+def _as_iso_string(value: object) -> str:
+    """Normalize Firestore timestamp-like values into ISO strings."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    isoformat = getattr(value, "isoformat", None)
+    if callable(isoformat):
+        return isoformat()
+    return str(value)
+
+
 @router.get("")
 async def list_images(
     current_user: CurrentUser,
@@ -31,6 +43,7 @@ async def list_images(
     images = []
     for doc in query.stream():
         data = doc.to_dict()
+        generated_at = _as_iso_string(data.get("generated_at", ""))
         images.append(
             {
                 "id": doc.id,
@@ -43,7 +56,7 @@ async def list_images(
                 "art_style": data.get("art_style", ""),
                 "pose": data.get("pose", ""),
                 "mood": data.get("mood", ""),
-                "generated_at": data.get("generated_at", ""),
+                "generated_at": generated_at,
                 "signed_url": None,
             }
         )

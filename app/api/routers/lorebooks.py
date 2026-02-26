@@ -14,6 +14,18 @@ router = APIRouter(prefix="/api/lorebooks", tags=["lorebooks"])
 CurrentUser = Annotated[AuthUser, Depends(get_current_user)]
 
 
+def _as_iso_string(value: object) -> str:
+    """Normalize Firestore timestamp-like values into ISO strings."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    isoformat = getattr(value, "isoformat", None)
+    if callable(isoformat):
+        return isoformat()
+    return str(value)
+
+
 class EntryUpdate(BaseModel):
     category: str | None = None
     name: str | None = None
@@ -53,12 +65,12 @@ async def list_lorebooks(current_user: CurrentUser):
         lb = lb_snap.to_dict()
         summaries.append(
             {
-                "id": lb["id"],
-                "title": lb["title"],
+                "id": lb.get("id", lb_snap.id),
+                "title": lb.get("title", "Untitled lorebook"),
                 "genre": lb.get("genre", ""),
                 "description": lb.get("description", ""),
                 "entry_count": lb.get("entry_count", 0),
-                "updated_at": lb.get("updated_at", ""),
+                "updated_at": _as_iso_string(lb.get("updated_at", "")),
             }
         )
     return summaries

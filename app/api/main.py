@@ -25,7 +25,12 @@ app = FastAPI(
     description="REST gateway for LorePack — collaborative worldbuilding & story generation.",
 )
 
-_default_origins = ["http://localhost:5173", "http://localhost:3000"]
+_default_origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://lorepack.xyz",
+    "https://www.lorepack.xyz",
+]
 _extra_origins = os.environ.get("ALLOWED_ORIGINS", "").split(",")
 _all_origins = _default_origins + [o.strip() for o in _extra_origins if o.strip()]
 

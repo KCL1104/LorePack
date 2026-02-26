@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Navigate, useLocation } from 'react-router';
 
 import { getFirebaseConfigError, isFirebaseConfigured } from '../auth/firebase';
-import { LOCALE_LABELS, useI18n } from '../i18n';
+import { useI18n } from '../i18n';
 import { useAuthStore } from '../stores/authStore';
 import styles from './Auth.module.css';
 
@@ -26,7 +26,7 @@ export default function AuthPage() {
   const resolveGoogleLinkWithPassword = useAuthStore((state) => state.resolveGoogleLinkWithPassword);
 
   const location = useLocation();
-  const { locale, toggleLocale, t } = useI18n();
+  const { t } = useI18n();
   const locationState = (location.state as LocationState | null) || null;
   const redirectTo = locationState?.from?.pathname || '/dashboard';
 
@@ -102,9 +102,7 @@ export default function AuthPage() {
   return (
     <div className={styles.page}>
       <div className={styles.card}>
-        <button className={styles.switchMode} type="button" onClick={toggleLocale}>
-          {t('Language')}: {LOCALE_LABELS[locale]}
-        </button>
+        {/* Language switcher hidden; i18n kept for future use */}
         <h1 className={styles.title}>LorePack</h1>
         <p className={styles.subtitle}>{t('Enter the codex and continue your worldbuilding journey.')}</p>
 

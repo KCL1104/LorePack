@@ -15,18 +15,7 @@ import {
 } from './translations';
 
 function detectLocale(): SupportedLocale {
-  if (typeof window === 'undefined') return DEFAULT_LOCALE;
-
-  const stored = window.localStorage.getItem(LOCALE_STORAGE_KEY);
-  if (stored === 'en' || stored === 'zh-TW') {
-    return stored;
-  }
-
-  if (window.navigator.language.toLowerCase().startsWith('zh')) {
-    return 'zh-TW';
-  }
-
-  return 'en';
+  return DEFAULT_LOCALE;
 }
 
 function interpolate(template: string, values?: InterpolationValues): string {

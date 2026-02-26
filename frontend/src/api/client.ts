@@ -22,7 +22,7 @@ import type {
   A2AInteractionResult,
 } from './types';
 
-const RAW_API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const RAW_API_BASE = import.meta.env.VITE_API_URL ?? '';
 const API_BASE = RAW_API_BASE.replace(/\/$/, '');
 const API_PREFIX = API_BASE.endsWith('/api') ? '' : '/api';
 

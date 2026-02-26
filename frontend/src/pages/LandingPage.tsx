@@ -4,7 +4,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { animate, stagger } from 'animejs';
 import * as THREE from 'three';
 import { Divider } from '../components/ui';
-import { LOCALE_LABELS, useI18n } from '../i18n';
+import { useI18n } from '../i18n';
 import styles from './LandingPage.module.css';
 
 // Pre-generate particle data outside the component to avoid impure calls during render
@@ -264,7 +264,7 @@ function useScrollReveal() {
 
 export default function LandingPage() {
     const mainRef = useRef<HTMLElement>(null);
-    const { locale, toggleLocale, t } = useI18n();
+    const { t } = useI18n();
 
     // Hero entrance animation (above fold — fires immediately)
     useEffect(() => {
@@ -296,9 +296,7 @@ export default function LandingPage() {
             <nav className={styles.navbar} data-landing-hero>
                 <div className={styles.logo}>✦ LOREPACK</div>
                 <div style={{ display: 'flex', gap: '0.4rem' }}>
-                    <button type="button" className={styles.loginBtn} onClick={toggleLocale}>
-                        {t('Language')}: {LOCALE_LABELS[locale]}
-                    </button>
+                    {/* Language switcher hidden; i18n kept for future use */}
                     <Link to="/auth" className={styles.loginBtn}>{t('Enter the Sanctum')}</Link>
                 </div>
             </nav>

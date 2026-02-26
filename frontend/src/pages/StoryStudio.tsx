@@ -326,6 +326,7 @@ export default function StoryStudio() {
   const previousStepRef = useRef(0);
   const idCounterRef = useRef(0);
   const autoResumeAttempted = useRef(false);
+  const sessionListRef = useRef<HTMLDivElement>(null);
 
   const sessions = useAppStore((state) => state.sessions);
   const fetchSessions = useAppStore((state) => state.fetchSessions);
@@ -1180,7 +1181,7 @@ export default function StoryStudio() {
                   </p>
                 </Card>
 
-                <Card hoverable={false} className={styles.selectCard}>
+                <Card className={styles.selectCard} onClick={() => sessionListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}>
                   <span className={styles.selectIcon}>↻</span>
                   <h3 className={styles.selectCardTitle}>{t('Continue an Existing Tale')}</h3>
                   <p className={styles.selectCardDesc}>
@@ -1190,7 +1191,7 @@ export default function StoryStudio() {
               </div>
 
               {sessions.length > 0 ? (
-                <div className={styles.sessionList}>
+                <div ref={sessionListRef} className={styles.sessionList}>
                   <SectionHeader title={t('Your Stories')} />
                   {sessions.map((s) => (
                     <Card

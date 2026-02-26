@@ -1,7 +1,7 @@
 export type SupportedLocale = 'en' | 'zh-TW';
 
 export const LOCALE_STORAGE_KEY = 'lorepack.locale';
-export const DEFAULT_LOCALE: SupportedLocale = 'zh-TW';
+export const DEFAULT_LOCALE: SupportedLocale = 'en';
 
 export const LOCALE_LABELS: Record<SupportedLocale, string> = {
   en: 'EN',

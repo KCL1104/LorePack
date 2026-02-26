@@ -15,6 +15,7 @@ import {
   type A2AInteractionResult,
 } from '../api';
 import { Button, Card, Input, SectionHeader, Tag } from '../components/ui';
+import { useI18n } from '../i18n';
 import { useAppStore } from '../stores/appStore';
 import styles from './Crossroads.module.css';
 
@@ -46,11 +47,11 @@ function parseCharacterNames(value: string): string[] {
   return Array.from(new Set(entries));
 }
 
-function formatDate(value: string): string {
-  if (!value) return 'Unknown';
+function formatDate(value: string, dateLocale: string, unknownLabel: string): string {
+  if (!value) return unknownLabel;
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return new Intl.DateTimeFormat('zh-TW', {
+  return new Intl.DateTimeFormat(dateLocale, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -59,6 +60,7 @@ function formatDate(value: string): string {
 }
 
 export default function Crossroads() {
+  const { dateLocale, t } = useI18n();
   const lorebooks = useAppStore((state) => state.lorebooks);
   const fetchLorebooks = useAppStore((state) => state.fetchLorebooks);
   const a2aAgents = useAppStore((state) => state.a2aAgents);
@@ -414,7 +416,7 @@ export default function Crossroads() {
               {' → '}
               {lorebookNameById[record.proposal.target_lorebook_id] || record.proposal.target_lorebook_id}
             </p>
-            <p className={styles.proposalTime}>{formatDate(record.createdAt)}</p>
+            <p className={styles.proposalTime}>{formatDate(record.createdAt, dateLocale, t('Unknown'))}</p>
           </div>
           <span className={`${styles.statusBadge} ${styles[`status${record.status}`]}`}>
             {record.status}
@@ -478,10 +480,10 @@ export default function Crossroads() {
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <p className={styles.kicker}>The Crossroads</p>
-        <h1 className={styles.title}>Collaboration Hub</h1>
+        <p className={styles.kicker}>{t('The Crossroads')}</p>
+        <h1 className={styles.title}>{t('Collaboration Hub')}</h1>
         <p className={styles.subtitle}>
-          Discover public worlds, import shared lorebooks, and negotiate crossover proposals.
+          {t('Discover public worlds, import shared lorebooks, and negotiate crossover proposals.')}
         </p>
       </header>
 
@@ -489,7 +491,7 @@ export default function Crossroads() {
 
       {loading ? (
         <Card hoverable={false} className={styles.loadingCard}>
-          <p>Opening collaboration channels...</p>
+          <p>{t('Opening collaboration channels...')}</p>
         </Card>
       ) : (
         <>

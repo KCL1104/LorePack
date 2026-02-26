@@ -4,6 +4,7 @@ import { NavLink, useNavigate } from 'react-router';
 import { listPublicLorebooks } from '../../api';
 import { useAppStore } from '../../stores/appStore';
 import { useAuthStore } from '../../stores/authStore';
+import { LOCALE_LABELS, useI18n } from '../../i18n';
 import styles from './Sidebar.module.css';
 
 interface NavItem {
@@ -23,6 +24,7 @@ const navItems: NavItem[] = [
 export function Sidebar() {
   const navigate = useNavigate();
   const signOutUser = useAuthStore((state) => state.signOutUser);
+  const { locale, toggleLocale, t } = useI18n();
   const [signingOut, setSigningOut] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [publicCount, setPublicCount] = useState(0);
@@ -90,17 +92,21 @@ export function Sidebar() {
               `${styles.navItem}${isActive ? ` ${styles.active}` : ''}`
             }
           >
-            <span className={styles.navLabel}>{item.label}</span>
+            <span className={styles.navLabel}>{t(item.label)}</span>
             {item.badgeKey === 'crossroads' && publicCount > 0 ? (
-              <span className={styles.badge} aria-label={`${publicCount} public worlds`} />
+              <span className={styles.badge} aria-label={t('{count} public worlds', { count: publicCount })} />
             ) : null}
           </NavLink>
         ))}
 
         <div className={styles.spacer} />
 
+        <button className={`${styles.navItem} ${styles.actionButton}`} type="button" onClick={toggleLocale}>
+          <span className={styles.navLabel}>{t('Language')}: {LOCALE_LABELS[locale]}</span>
+        </button>
+
         <button className={`${styles.navItem} ${styles.actionButton}`} type="button" onClick={handleSignOut} disabled={signingOut}>
-          <span className={styles.navLabel}>{signingOut ? 'Signing out...' : 'Sign out'}</span>
+          <span className={styles.navLabel}>{signingOut ? t('Signing out...') : t('Sign out')}</span>
         </button>
       </nav>
     </aside>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Navigate, useLocation } from 'react-router';
 
 import { getFirebaseConfigError, isFirebaseConfigured } from '../auth/firebase';
+import { LOCALE_LABELS, useI18n } from '../i18n';
 import { useAuthStore } from '../stores/authStore';
 import styles from './Auth.module.css';
 
@@ -25,6 +26,7 @@ export default function AuthPage() {
   const resolveGoogleLinkWithPassword = useAuthStore((state) => state.resolveGoogleLinkWithPassword);
 
   const location = useLocation();
+  const { locale, toggleLocale, t } = useI18n();
   const locationState = (location.state as LocationState | null) || null;
   const redirectTo = locationState?.from?.pathname || '/dashboard';
 
@@ -42,29 +44,29 @@ export default function AuthPage() {
     initializeAuth();
   }, [initializeAuth]);
 
-  const submitLabel = activeMode === 'signup' ? 'Create account' : 'Sign in';
+  const submitLabel = activeMode === 'signup' ? t('Create account') : t('Sign in');
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
 
     if (!effectiveEmail.trim()) {
-      setError('Please enter your email.');
+      setError(t('Please enter your email.'));
       return;
     }
 
     if (!password) {
-      setError('Please enter your password.');
+      setError(t('Please enter your password.'));
       return;
     }
 
     if (activeMode === 'signup') {
       if (password.length < 8) {
-        setError('Password must be at least 8 characters.');
+        setError(t('Password must be at least 8 characters.'));
         return;
       }
       if (password !== confirmPassword) {
-        setError('Passwords do not match.');
+        setError(t('Passwords do not match.'));
         return;
       }
     }
@@ -80,7 +82,7 @@ export default function AuthPage() {
         await signInWithEmail(normalizedEmail, password);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed.');
+      setError(err instanceof Error ? err.message : t('Authentication failed.'));
     }
   };
 
@@ -89,7 +91,7 @@ export default function AuthPage() {
     try {
       await signInWithGoogle();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Google sign-in failed.');
+      setError(err instanceof Error ? err.message : t('Google sign-in failed.'));
     }
   };
 
@@ -100,22 +102,25 @@ export default function AuthPage() {
   return (
     <div className={styles.page}>
       <div className={styles.card}>
+        <button className={styles.switchMode} type="button" onClick={toggleLocale}>
+          {t('Language')}: {LOCALE_LABELS[locale]}
+        </button>
         <h1 className={styles.title}>LorePack</h1>
-        <p className={styles.subtitle}>Enter the codex and continue your worldbuilding journey.</p>
+        <p className={styles.subtitle}>{t('Enter the codex and continue your worldbuilding journey.')}</p>
 
         {!isFirebaseConfigured() ? (
-          <p className={styles.error}>{firebaseConfigError || 'Firebase is not configured.'}</p>
+          <p className={styles.error}>{firebaseConfigError || t('Firebase is not configured.')}</p>
         ) : (
           <>
             {pendingGoogleLinkEmail && (
               <div className={styles.notice}>
-                This email already uses password login. Sign in once with password and Google will be linked automatically.
+                {t('This email already uses password login. Sign in once with password and Google will be linked automatically.')}
               </div>
             )}
 
             <form className={styles.form} onSubmit={handleSubmit}>
               <label className={styles.label} htmlFor="auth-email">
-                Email
+                {t('Email')}
               </label>
               <input
                 id="auth-email"
@@ -128,7 +133,7 @@ export default function AuthPage() {
               />
 
               <label className={styles.label} htmlFor="auth-password">
-                Password
+                {t('Password')}
               </label>
               <input
                 id="auth-password"
@@ -143,7 +148,7 @@ export default function AuthPage() {
               {activeMode === 'signup' && (
                 <>
                   <label className={styles.label} htmlFor="auth-confirm-password">
-                    Confirm password
+                    {t('Confirm password')}
                   </label>
                   <input
                     id="auth-confirm-password"
@@ -160,12 +165,12 @@ export default function AuthPage() {
               {error && <p className={styles.error}>{error}</p>}
 
               <button className={styles.primaryButton} type="submit" disabled={loading}>
-                {loading ? 'Working...' : submitLabel}
+                {loading ? t('Working...') : submitLabel}
               </button>
             </form>
 
             <button className={styles.googleButton} type="button" onClick={handleGoogleSignIn} disabled={loading}>
-              Continue with Google
+              {t('Continue with Google')}
             </button>
 
             <button
@@ -177,7 +182,7 @@ export default function AuthPage() {
               }}
               disabled={loading || Boolean(pendingGoogleLinkEmail)}
             >
-              {activeMode === 'signin' ? 'Need an account? Sign up' : 'Already have an account? Sign in'}
+              {activeMode === 'signin' ? t('Need an account? Sign up') : t('Already have an account? Sign in')}
             </button>
           </>
         )}

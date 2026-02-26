@@ -16,6 +16,7 @@ import {
   type LorebookValidation,
 } from '../api';
 import { Button, Card, Input, SectionHeader, Tag } from '../components/ui';
+import { useI18n } from '../i18n';
 import { useAppStore } from '../stores/appStore';
 import styles from './LorebookEditor.module.css';
 
@@ -88,11 +89,11 @@ function getSectionIdByCategory(category: string): string {
   return match?.id || 'other';
 }
 
-function formatDate(value: string): string {
-  if (!value) return 'Unknown';
+function formatDate(value: string, dateLocale: string, unknownLabel: string): string {
+  if (!value) return unknownLabel;
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return new Intl.DateTimeFormat('zh-TW', {
+  return new Intl.DateTimeFormat(dateLocale, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -119,6 +120,7 @@ function parseTags(tagsText: string): string[] {
 }
 
 export default function LorebookEditor() {
+  const { dateLocale, t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
   const lorebooks = useAppStore((state) => state.lorebooks);
   const currentLorebook = useAppStore((state) => state.currentLorebook);
@@ -461,20 +463,20 @@ export default function LorebookEditor() {
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <p className={styles.kicker}>The Archive</p>
-        <h1 className={styles.title}>Lorebook Editor</h1>
+        <p className={styles.kicker}>{t('The Archive')}</p>
+        <h1 className={styles.title}>{t('Lorebook Editor')}</h1>
       </header>
 
       {error ? <div className={styles.errorBanner}>{error}</div> : null}
 
       {loading ? (
         <Card hoverable={false}>
-          <p>Opening archive records...</p>
+          <p>{t('Opening archive records...')}</p>
         </Card>
       ) : (
         <div className={styles.layout}>
           <Card hoverable={false} className={styles.treeColumn}>
-            <SectionHeader title="Directory Tree" />
+            <SectionHeader title={t('Directory Tree')} />
 
             {lorebooks.length === 0 ? (
               <p className={styles.muted}>No lorebooks available yet.</p>
@@ -644,7 +646,7 @@ export default function LorebookEditor() {
           </Card>
 
           <Card hoverable={false} className={styles.detailColumn}>
-            <SectionHeader title="Entry Detail" />
+            <SectionHeader title={t('Entry Detail')} />
 
             {!selectedLorebookId ? (
               <p className={styles.muted}>Select a lorebook to begin editing.</p>
@@ -726,7 +728,7 @@ export default function LorebookEditor() {
                   <p className={styles.label}>Source Metadata</p>
                   <p className={styles.metaText}>Source: {sourceText}</p>
                   <p className={styles.metaText}>
-                    Created at: {selectedEntry ? formatDate(selectedEntry.created_at) : 'Pending save'}
+                    {t('Created at')}: {selectedEntry ? formatDate(selectedEntry.created_at, dateLocale, t('Unknown')) : t('Pending save')}
                   </p>
                 </div>
 

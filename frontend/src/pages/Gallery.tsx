@@ -6,6 +6,7 @@ import {
   type ImageAsset,
 } from '../api';
 import { Button, Card, SectionHeader, Tag } from '../components/ui';
+import { useI18n } from '../i18n';
 import { useAppStore } from '../stores/appStore';
 import styles from './Gallery.module.css';
 
@@ -30,11 +31,11 @@ function summarizePrompt(prompt: string): string {
   return `${normalized.slice(0, 167)}...`;
 }
 
-function formatDate(value: string): string {
-  if (!value) return 'Unknown';
+function formatDate(value: string, dateLocale: string, unknownLabel: string): string {
+  if (!value) return unknownLabel;
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return new Intl.DateTimeFormat('zh-TW', {
+  return new Intl.DateTimeFormat(dateLocale, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -54,6 +55,7 @@ function resolveImageUrl(signedUrl: string | null | undefined, fallback: string)
 }
 
 export default function Gallery() {
+  const { dateLocale, t } = useI18n();
   const images = useAppStore((state) => state.images);
   const lorebooks = useAppStore((state) => state.lorebooks);
   const fetchImages = useAppStore((state) => state.fetchImages);
@@ -79,7 +81,7 @@ export default function Gallery() {
         await Promise.all([fetchImages(), fetchLorebooks()]);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load gallery records.');
+          setError(err instanceof Error ? err.message : t('Failed to load gallery records.'));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -90,7 +92,7 @@ export default function Gallery() {
     return () => {
       cancelled = true;
     };
-  }, [fetchImages, fetchLorebooks]);
+  }, [fetchImages, fetchLorebooks, t]);
 
   useEffect(() => {
     if (!actionMessage) return;
@@ -176,7 +178,7 @@ export default function Gallery() {
 
     const lorebookId = lightboxAsset.lorebook_id;
     if (!lorebookId) {
-      setError('Cannot regenerate this vision because lorebook metadata is missing.');
+      setError(t('Cannot regenerate this vision because lorebook metadata is missing.'));
       return;
     }
 
@@ -184,7 +186,7 @@ export default function Gallery() {
 
     setRegeneratingId(lightboxAsset.id);
     setError(null);
-    setActionMessage('Regeneration started...');
+    setActionMessage(t('Regeneration started...'));
 
     try {
       for await (const event of generateImage({
@@ -197,9 +199,9 @@ export default function Gallery() {
       }
 
       await fetchImages();
-      setActionMessage('Regeneration complete. Gallery refreshed.');
+      setActionMessage(t('Regeneration complete. Gallery refreshed.'));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Regeneration failed.');
+      setError(err instanceof Error ? err.message : t('Regeneration failed.'));
     } finally {
       setRegeneratingId(null);
     }
@@ -207,7 +209,7 @@ export default function Gallery() {
 
   const handleOpenInNewTab = () => {
     if (!lightboxUrl) {
-      setError('No accessible URL found for this vision.');
+      setError(t('No accessible URL found for this vision.'));
       return;
     }
     window.open(lightboxUrl, '_blank', 'noopener,noreferrer');
@@ -219,15 +221,15 @@ export default function Gallery() {
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <p className={styles.kicker}>The Gallery of Visions</p>
-        <h1 className={styles.title}>Visual Archive</h1>
+        <p className={styles.kicker}>{t('The Gallery of Visions')}</p>
+        <h1 className={styles.title}>{t('Visual Archive')}</h1>
         <p className={styles.subtitle}>
-          Curate generated character portraits and scene renderings from across your living worlds.
+          {t('Curate generated character portraits and scene renderings from across your living worlds.')}
         </p>
       </header>
 
       <section className={styles.filters}>
-        <div className={styles.tabs} role="tablist" aria-label="Gallery type filters">
+        <div className={styles.tabs} role="tablist" aria-label={t('Gallery type filters')}>
           {FILTER_TABS.map((tab) => (
             <button
               key={tab.value}
@@ -237,7 +239,7 @@ export default function Gallery() {
               className={`${styles.tabButton}${assetFilter === tab.value ? ` ${styles.tabActive}` : ''}`}
               onClick={() => setAssetFilter(tab.value)}
             >
-              {tab.label}
+              {t(tab.label)}
             </button>
           ))}
           <span
@@ -249,7 +251,7 @@ export default function Gallery() {
 
         <div className={styles.lorebookFilter}>
           <label className={styles.lorebookLabel} htmlFor="gallery-lorebook-filter">
-            Lorebook
+            {t('Lorebook')}
           </label>
           <select
             id="gallery-lorebook-filter"
@@ -257,7 +259,7 @@ export default function Gallery() {
             value={selectedLorebookId}
             onChange={(event) => setSelectedLorebookId(event.target.value)}
           >
-            <option value="all">All Lorebooks</option>
+            <option value="all">{t('All Lorebooks')}</option>
             {lorebooks.map((lorebook) => (
               <option key={lorebook.id} value={lorebook.id}>
                 {lorebook.title}
@@ -267,51 +269,51 @@ export default function Gallery() {
         </div>
       </section>
 
-      {error ? <div className={styles.errorBanner}>Gallery sync failed: {error}</div> : null}
+      {error ? <div className={styles.errorBanner}>{t('Gallery sync failed: {error}', { error })}</div> : null}
       {actionMessage ? <div className={styles.infoBanner}>{actionMessage}</div> : null}
 
       {loading ? (
         <Card hoverable={false} className={styles.loadingCard}>
-          <p>Opening the gallery vault...</p>
+          <p>{t('Opening the gallery vault...')}</p>
         </Card>
       ) : filteredImages.length === 0 ? (
         images.length === 0 ? (
           <Card hoverable={false} className={styles.guideCard}>
-            <h2 className={styles.guideTitle}>Your gallery is empty — let's fill it with visions</h2>
+            <h2 className={styles.guideTitle}>{t("Your gallery is empty — let's fill it with visions")}</h2>
             <p className={styles.guideSubtitle}>
-              Images are generated automatically or on demand. Here are 3 ways to populate your gallery:
+              {t('Images are generated automatically or on demand. Here are 3 ways to populate your gallery:')}
             </p>
             <div className={styles.guideSteps}>
               <div className={styles.guideStep}>
                 <span className={styles.guideIcon}>✦</span>
-                <h3 className={styles.guideStepTitle}>1. Conjure a New Story</h3>
+                <h3 className={styles.guideStepTitle}>{t('1. Conjure a New Story')}</h3>
                 <p className={styles.guideStepDesc}>
-                  Start a tale in <strong>Story Studio</strong>. Character portraits and scene images are generated automatically during world creation.
+                  {t('Start a tale in Story Studio. Character portraits and scene images are generated automatically during world creation.')}
                 </p>
-                <Link to="/story-studio" className={styles.guideLink}>Open Story Studio →</Link>
+                <Link to="/story-studio" className={styles.guideLink}>{t('Open Story Studio →')}</Link>
               </div>
               <div className={styles.guideStep}>
                 <span className={styles.guideIcon}>◈</span>
-                <h3 className={styles.guideStepTitle}>2. Generate from Lorebook</h3>
+                <h3 className={styles.guideStepTitle}>{t('2. Generate from Lorebook')}</h3>
                 <p className={styles.guideStepDesc}>
-                  Open the <strong>Lorebook Editor</strong> and click &quot;Generate Image&quot; on any character, location, or event entry.
+                  {t('Open Lorebook Editor and click "Generate Image" on any character, location, or event entry.')}
                 </p>
-                <Link to="/lorebook" className={styles.guideLink}>Open Lorebook Editor →</Link>
+                <Link to="/lorebook" className={styles.guideLink}>{t('Open Lorebook Editor →')}</Link>
               </div>
               <div className={styles.guideStep}>
                 <span className={styles.guideIcon}>↻</span>
-                <h3 className={styles.guideStepTitle}>3. Regenerate in Gallery</h3>
+                <h3 className={styles.guideStepTitle}>{t('3. Regenerate in Gallery')}</h3>
                 <p className={styles.guideStepDesc}>
-                  Once you have images, open any vision in the lightbox and click &quot;Regenerate&quot; for a fresh interpretation.
+                  {t('Once you have images, open any vision in the lightbox and click "Regenerate" for a fresh interpretation.')}
                 </p>
               </div>
             </div>
           </Card>
         ) : (
           <Card hoverable={false} className={styles.emptyCard}>
-            <p>No visions match this filter.</p>
+            <p>{t('No visions match this filter.')}</p>
             <p className={styles.mutedText}>
-              Try selecting &quot;All&quot; or a different lorebook. You have {images.length} total vision{images.length !== 1 ? 's' : ''} in the gallery.
+              {t('Try selecting "All" or a different lorebook. You have {count} total visions in the gallery.', { count: images.length })}
             </p>
           </Card>
         )
@@ -319,9 +321,9 @@ export default function Gallery() {
         <>
           {heroImage ? (
             <section className={styles.heroSection}>
-              <SectionHeader title="Featured Vision">
+              <SectionHeader title={t('Featured Vision')}>
                 <Link to="/story-studio" className={styles.sectionMeta}>
-                  Open Writing Desk
+                  {t('Open Writing Desk')}
                 </Link>
               </SectionHeader>
 
@@ -335,7 +337,7 @@ export default function Gallery() {
                       loading="lazy"
                     />
                   ) : (
-                    <div className={styles.imageFallback}>Signed URL unavailable</div>
+                    <div className={styles.imageFallback}>{t('Signed URL unavailable')}</div>
                   )}
 
                   <div className={styles.heroOverlay}>
@@ -344,9 +346,9 @@ export default function Gallery() {
                       {heroImage.lorebook_id ? <Tag label={`Lorebook ${heroImage.lorebook_id}`} /> : null}
                     </div>
                     <h2 className={styles.heroTitle}>{getVisionTitle(heroImage)}</h2>
-                    <p className={styles.heroPrompt}>{summarizePrompt(heroImage.prompt_used)}</p>
+                    <p className={styles.heroPrompt}>{summarizePrompt(heroImage.prompt_used || t('No prompt metadata.'))}</p>
                     <Button variant="ghost" onClick={() => setLightboxImageId(heroImage.id)}>
-                      View metadata
+                      {t('View metadata')}
                     </Button>
                   </div>
                 </Card>
@@ -354,19 +356,19 @@ export default function Gallery() {
                 <Card hoverable={false} className={styles.heroMetaCard}>
                   <p className={styles.metaRow}>
                     <span className={styles.metaLabel}>Type</span>
-                    <span className={styles.metaValue}>{formatAssetType(heroImage.asset_type)}</span>
+                    <span className={styles.metaValue}>{t(formatAssetType(heroImage.asset_type))}</span>
                   </p>
                   <p className={styles.metaRow}>
-                    <span className={styles.metaLabel}>Art Style</span>
-                    <span className={styles.metaValue}>{heroImage.art_style || 'Unknown'}</span>
+                    <span className={styles.metaLabel}>{t('Art Style')}</span>
+                    <span className={styles.metaValue}>{heroImage.art_style || t('Unknown')}</span>
                   </p>
                   <p className={styles.metaRow}>
-                    <span className={styles.metaLabel}>Generated</span>
-                    <span className={styles.metaValue}>{formatDate(heroImage.generated_at)}</span>
+                    <span className={styles.metaLabel}>{t('Generated')}</span>
+                    <span className={styles.metaValue}>{formatDate(heroImage.generated_at, dateLocale, t('Unknown'))}</span>
                   </p>
                   <p className={styles.metaRow}>
-                    <span className={styles.metaLabel}>Prompt</span>
-                    <span className={styles.metaValue}>{summarizePrompt(heroImage.prompt_used)}</span>
+                    <span className={styles.metaLabel}>{t('Prompt')}</span>
+                    <span className={styles.metaValue}>{summarizePrompt(heroImage.prompt_used || t('No prompt metadata.'))}</span>
                   </p>
                 </Card>
               </div>
@@ -374,13 +376,13 @@ export default function Gallery() {
           ) : null}
 
           <section className={styles.gridSection}>
-            <SectionHeader title="Vision Grid">
-              <span className={styles.sectionMeta}>{gridImages.length} entries</span>
+            <SectionHeader title={t('Vision Grid')}>
+              <span className={styles.sectionMeta}>{t('{count} entries', { count: gridImages.length })}</span>
             </SectionHeader>
 
             {gridImages.length === 0 ? (
               <Card hoverable={false} className={styles.emptyCard}>
-                <p>No additional visions beyond the featured image.</p>
+                <p>{t('No additional visions beyond the featured image.')}</p>
               </Card>
             ) : (
               <div className={styles.grid}>
@@ -407,12 +409,12 @@ export default function Gallery() {
                             loading="lazy"
                           />
                         ) : (
-                          <div className={styles.imageFallback}>Vision preview unavailable</div>
+                          <div className={styles.imageFallback}>{t('Vision preview unavailable')}</div>
                         )}
 
                         <div className={styles.gridOverlay}>
                           <p className={styles.gridTitle}>{getVisionTitle(asset)}</p>
-                          <p className={styles.gridMeta}>{formatDate(asset.generated_at)}</p>
+                          <p className={styles.gridMeta}>{formatDate(asset.generated_at, dateLocale, t('Unknown'))}</p>
                         </div>
                       </Card>
                     </button>
@@ -434,7 +436,7 @@ export default function Gallery() {
             className={styles.lightbox}
             role="dialog"
             aria-modal="true"
-            aria-label="Vision details"
+            aria-label={t('Vision details')}
             onClick={(event) => event.stopPropagation()}
           >
             <button
@@ -442,7 +444,7 @@ export default function Gallery() {
               className={`${styles.navArrow} ${styles.leftArrow}`}
               onClick={() => shiftLightbox(-1)}
               disabled={filteredImages.length <= 1}
-              aria-label="Previous vision"
+              aria-label={t('Previous vision')}
             >
               ‹
             </button>
@@ -455,7 +457,7 @@ export default function Gallery() {
                   className={styles.lightboxImage}
                 />
               ) : (
-                <div className={styles.lightboxFallback}>No accessible image URL</div>
+                <div className={styles.lightboxFallback}>{t('No accessible image URL')}</div>
               )}
             </div>
 
@@ -464,29 +466,29 @@ export default function Gallery() {
               <div className={styles.panelMeta}>
                 <p>
                   <span className={styles.panelLabel}>Type</span>
-                  <span className={styles.panelValue}>{formatAssetType(lightboxAsset.asset_type)}</span>
+                  <span className={styles.panelValue}>{t(formatAssetType(lightboxAsset.asset_type))}</span>
                 </p>
                 <p>
-                  <span className={styles.panelLabel}>Art Style</span>
-                  <span className={styles.panelValue}>{lightboxAsset.art_style || 'Unknown'}</span>
+                  <span className={styles.panelLabel}>{t('Art Style')}</span>
+                  <span className={styles.panelValue}>{lightboxAsset.art_style || t('Unknown')}</span>
                 </p>
                 <p>
-                  <span className={styles.panelLabel}>Pose</span>
-                  <span className={styles.panelValue}>{lightboxAsset.pose || 'Not specified'}</span>
+                  <span className={styles.panelLabel}>{t('Pose')}</span>
+                  <span className={styles.panelValue}>{lightboxAsset.pose || t('Not specified')}</span>
                 </p>
                 <p>
-                  <span className={styles.panelLabel}>Generated</span>
-                  <span className={styles.panelValue}>{formatDate(lightboxAsset.generated_at)}</span>
+                  <span className={styles.panelLabel}>{t('Generated')}</span>
+                  <span className={styles.panelValue}>{formatDate(lightboxAsset.generated_at, dateLocale, t('Unknown'))}</span>
                 </p>
                 <p>
-                  <span className={styles.panelLabel}>Lorebook</span>
+                  <span className={styles.panelLabel}>{t('Lorebook')}</span>
                   <span className={styles.panelValue}>
-                    {lightboxAsset.lorebook_id || 'Unknown'}
+                    {lightboxAsset.lorebook_id || t('Unknown')}
                   </span>
                 </p>
               </div>
 
-              <p className={styles.lightboxPrompt}>{lightboxAsset.prompt_used || 'No prompt metadata.'}</p>
+              <p className={styles.lightboxPrompt}>{lightboxAsset.prompt_used || t('No prompt metadata.')}</p>
 
               <div className={styles.lightboxActions}>
                 <Button
@@ -496,26 +498,26 @@ export default function Gallery() {
                     || !lightboxAsset.lorebook_id
                   }
                 >
-                  {regeneratingId === lightboxAsset.id ? 'Regenerating...' : 'Regenerate'}
+                  {regeneratingId === lightboxAsset.id ? t('Regenerating...') : t('Regenerate')}
                 </Button>
                 <Button
                   variant="ghost"
                   onClick={() => {
                     setPinnedHeroId(lightboxAsset.id);
-                    setActionMessage('Featured vision updated.');
+                    setActionMessage(t('Featured vision updated.'));
                   }}
                 >
-                  Set as Hero
+                  {t('Set as Hero')}
                 </Button>
                 <Button variant="ghost" onClick={handleOpenInNewTab}>
-                  Open in new tab
+                  {t('Open in new tab')}
                 </Button>
                 <Button
                   variant="ghost"
                   className={styles.closeAction}
                   onClick={() => setLightboxImageId(null)}
                 >
-                  Close
+                  {t('Close')}
                 </Button>
               </div>
             </aside>
@@ -525,7 +527,7 @@ export default function Gallery() {
               className={`${styles.navArrow} ${styles.rightArrow}`}
               onClick={() => shiftLightbox(1)}
               disabled={filteredImages.length <= 1}
-              aria-label="Next vision"
+              aria-label={t('Next vision')}
             >
               ›
             </button>

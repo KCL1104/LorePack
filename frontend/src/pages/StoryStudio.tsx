@@ -15,6 +15,7 @@ import {
   type SessionDetail,
 } from '../api';
 import { Button, Card, Input, SectionHeader, Tag } from '../components/ui';
+import { useI18n } from '../i18n';
 import { useAppStore } from '../stores/appStore';
 import styles from './StoryStudio.module.css';
 
@@ -291,6 +292,7 @@ function InkDiffusionField() {
 }
 
 export default function StoryStudio() {
+  const { dateLocale, t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
   const [phase, setPhase] = useState<'select' | 'conjure' | 'desk'>('select');
   const [stepIndex, setStepIndex] = useState(0);
@@ -1155,10 +1157,10 @@ export default function StoryStudio() {
       {phase === 'select' ? (
         <section className={styles.conjurePanel}>
           <header className={styles.header}>
-            <p className={styles.kicker}>The Writing Desk</p>
-            <h1 className={styles.title}>Story Studio</h1>
+            <p className={styles.kicker}>{t('The Writing Desk')}</p>
+            <h1 className={styles.title}>{t('Story Studio')}</h1>
             <p className={styles.subtitle}>
-              Begin a new tale from scratch, or continue weaving an existing story.
+              {t('Begin a new tale from scratch, or continue weaving an existing story.')}
             </p>
           </header>
 
@@ -1172,24 +1174,24 @@ export default function StoryStudio() {
               <div className={styles.selectGrid}>
                 <Card className={styles.selectCard} onClick={() => setPhase('conjure')}>
                   <span className={styles.selectIcon}>✦</span>
-                  <h3 className={styles.selectCardTitle}>Begin a New Tale</h3>
+                  <h3 className={styles.selectCardTitle}>{t('Begin a New Tale')}</h3>
                   <p className={styles.selectCardDesc}>
-                    Conjure a fresh world with genre, era, protagonist, and spark.
+                    {t('Conjure a fresh world with genre, era, protagonist, and spark.')}
                   </p>
                 </Card>
 
                 <Card hoverable={false} className={styles.selectCard}>
                   <span className={styles.selectIcon}>↻</span>
-                  <h3 className={styles.selectCardTitle}>Continue an Existing Tale</h3>
+                  <h3 className={styles.selectCardTitle}>{t('Continue an Existing Tale')}</h3>
                   <p className={styles.selectCardDesc}>
-                    Resume a previous story session and keep writing.
+                    {t('Resume a previous story session and keep writing.')}
                   </p>
                 </Card>
               </div>
 
               {sessions.length > 0 ? (
                 <div className={styles.sessionList}>
-                  <SectionHeader title="Your Stories" />
+                  <SectionHeader title={t('Your Stories')} />
                   {sessions.map((s) => (
                     <Card
                       key={s.id}
@@ -1202,14 +1204,14 @@ export default function StoryStudio() {
                         <Tag label={formatLabel(s.status)} />
                       </div>
                       <p className={styles.sessionRowMeta}>
-                        {s.updated_at ? new Date(s.updated_at).toLocaleDateString() : 'Unknown'}
+                        {s.updated_at ? new Date(s.updated_at).toLocaleDateString(dateLocale) : t('Unknown')}
                       </p>
                     </Card>
                   ))}
                 </div>
               ) : (
                 <Card hoverable={false} className={styles.emptySessionCard}>
-                  <p className={styles.placeholderText}>No existing stories yet. Begin a new tale to get started.</p>
+                  <p className={styles.placeholderText}>{t('No existing stories yet. Begin a new tale to get started.')}</p>
                 </Card>
               )}
             </>
@@ -1218,10 +1220,10 @@ export default function StoryStudio() {
       ) : phase === 'conjure' ? (
         <section className={styles.conjurePanel} data-step-panel>
           <header className={styles.header}>
-            <p className={styles.kicker}>Conjure Your World</p>
-            <h1 className={styles.title}>The Writing Desk</h1>
+            <p className={styles.kicker}>{t('Conjure Your World')}</p>
+            <h1 className={styles.title}>{t('The Writing Desk')}</h1>
             <p className={styles.subtitle}>
-              Shape genre, world, protagonist, and spark. When ready, summon the Narrative Director.
+              {t('Shape genre, world, protagonist, and spark. When ready, summon the Narrative Director.')}
             </p>
           </header>
 
@@ -1255,7 +1257,7 @@ export default function StoryStudio() {
               onClick={() => handleStepChange(Math.max(stepIndex - 1, 0))}
               disabled={stepIndex === 0 || isGenerating || stepTransitioning}
             >
-              Back
+              {t('Back')}
             </Button>
 
             {stepIndex < STEP_TITLES.length - 1 ? (
@@ -1263,31 +1265,31 @@ export default function StoryStudio() {
                 onClick={() => handleStepChange(Math.min(stepIndex + 1, STEP_TITLES.length - 1))}
                 disabled={!canProceedStep || isGenerating || stepTransitioning}
               >
-                Continue
+                {t('Continue')}
               </Button>
             ) : (
               <Button onClick={handleBeginTale} disabled={!canProceedStep || isGenerating || stepTransitioning}>
-                Begin Your Tale
+                {t('Begin Your Tale')}
               </Button>
             )}
           </footer>
         </section>
       ) : (
         <section className={styles.deskPanel}>
-          <Card hoverable={false} className={styles.contextBar} data-desk-reveal>
-            <div className={styles.contextHeader}>
-              <p className={styles.blockLabel}>Context Bar</p>
-              <Button
-                variant="ghost"
+            <Card hoverable={false} className={styles.contextBar} data-desk-reveal>
+              <div className={styles.contextHeader}>
+                <p className={styles.blockLabel}>{t('Context Bar')}</p>
+                <Button
+                  variant="ghost"
                 onClick={() => {
                   setPhase('conjure');
                   handleStepChange(0);
                 }}
-                disabled={isGenerating}
-              >
-                Return to Conjure
-              </Button>
-            </div>
+                  disabled={isGenerating}
+                >
+                  {t('Return to Conjure')}
+                </Button>
+              </div>
 
             {!contextCollapsed ? (
               <div className={styles.contextContent}>
@@ -1314,7 +1316,7 @@ export default function StoryStudio() {
 
           <div className={styles.workspace} data-desk-reveal>
             <Card hoverable={false} className={styles.scrollPanel}>
-              <SectionHeader title="Narrative Scroll" />
+              <SectionHeader title={t('Narrative Scroll')} />
 
               {!worldApproved && worldPreview ? (
                 <article className={styles.chapterBody}>
@@ -1354,12 +1356,12 @@ export default function StoryStudio() {
             </Card>
 
             <Card hoverable={false} className={styles.chatPanel}>
-              <SectionHeader title="Director's Chat" />
+              <SectionHeader title={t("Director's Chat")} />
               <p className={styles.statusLine}>{statusText}</p>
 
               <div className={styles.chatLog}>
                 {chatLog.length === 0 ? (
-                  <p className={styles.placeholderText}>No exchange yet.</p>
+                  <p className={styles.placeholderText}>{t('No exchange yet.')}</p>
                 ) : (
                   chatLog.map((message) => (
                     <div
@@ -1376,7 +1378,7 @@ export default function StoryStudio() {
               {!worldApproved ? (
                 <div className={styles.reviewActions}>
                   <p className={styles.reviewPrompt}>
-                    Review the conjured world. Request changes below, or approve to begin your tale.
+                    {t('Review the conjured world. Request changes below, or approve to begin your tale.')}
                   </p>
                   <div className={styles.chatComposer}>
                     <Input
@@ -1392,14 +1394,14 @@ export default function StoryStudio() {
                       onClick={handleSendDirection}
                       disabled={!sessionId || isGenerating || !messageDraft.trim()}
                     >
-                      Send Revisions
+                      {t('Send Revisions')}
                     </Button>
                   </div>
                   <Button
                     onClick={handleApproveWorld}
                     disabled={!sessionId || isGenerating}
                   >
-                    Approve World & Begin First Chapter
+                    {t('Approve World & Begin First Chapter')}
                   </Button>
                 </div>
               ) : (
@@ -1412,7 +1414,7 @@ export default function StoryStudio() {
                         setMessageDraft('Continue to the next chapter.');
                       }}
                     >
-                      ✦ Continue Story
+                      ✦ {t('Continue Story')}
                     </Button>
                   ) : null}
                   <Input
@@ -1424,7 +1426,7 @@ export default function StoryStudio() {
                     className={styles.chatInput}
                   />
                   <Button onClick={handleSendDirection} disabled={!sessionId || isGenerating || !messageDraft.trim()}>
-                    Send Direction
+                    {t('Send Direction')}
                   </Button>
                 </div>
               )}
@@ -1434,9 +1436,9 @@ export default function StoryStudio() {
           <Card hoverable={false} className={styles.bottomBar} data-desk-reveal>
             <div className={styles.chapterNav}>
               {!worldApproved && worldPreview ? (
-                <span className={styles.navHint}>✦ World preview — awaiting approval</span>
+                <span className={styles.navHint}>✦ {t('World preview — awaiting approval')}</span>
               ) : chapters.length === 0 ? (
-                <span className={styles.navHint}>○ No chapters yet</span>
+                <span className={styles.navHint}>○ {t('No chapters yet')}</span>
               ) : null}
               {chapters.map((chapter, index) => (
                 <button
@@ -1453,7 +1455,7 @@ export default function StoryStudio() {
 
             <div className={styles.loreUpdateStream}>
               {loreUpdates.length === 0 ? (
-                <span className={styles.navHint}>No lorebook updates yet.</span>
+                <span className={styles.navHint}>{t('No lorebook updates yet.')}</span>
               ) : (
                 loreUpdates.slice(0, 3).map((update) => (
                   <span key={update.id} className={styles.updateBadge}>

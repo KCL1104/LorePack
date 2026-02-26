@@ -4,6 +4,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { animate, stagger } from 'animejs';
 import * as THREE from 'three';
 import { Divider } from '../components/ui';
+import { LOCALE_LABELS, useI18n } from '../i18n';
 import styles from './LandingPage.module.css';
 
 // Pre-generate particle data outside the component to avoid impure calls during render
@@ -263,6 +264,7 @@ function useScrollReveal() {
 
 export default function LandingPage() {
     const mainRef = useRef<HTMLElement>(null);
+    const { locale, toggleLocale, t } = useI18n();
 
     // Hero entrance animation (above fold — fires immediately)
     useEffect(() => {
@@ -293,22 +295,26 @@ export default function LandingPage() {
 
             <nav className={styles.navbar} data-landing-hero>
                 <div className={styles.logo}>✦ LOREPACK</div>
-                <Link to="/auth" className={styles.loginBtn}>Enter the Sanctum</Link>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <button type="button" className={styles.loginBtn} onClick={toggleLocale}>
+                        {t('Language')}: {LOCALE_LABELS[locale]}
+                    </button>
+                    <Link to="/auth" className={styles.loginBtn}>{t('Enter the Sanctum')}</Link>
+                </div>
             </nav>
 
             <main className={styles.mainContent} ref={mainRef}>
                 {/* ── Hero ── */}
                 <section className={styles.hero}>
-                    <p className={styles.eyebrow} data-landing-hero>AI-Powered Worldbuilding</p>
+                    <p className={styles.eyebrow} data-landing-hero>{t('AI-Powered Worldbuilding')}</p>
                     <h1 className={styles.title} data-landing-hero>
-                        Your stories deserve<br />a living universe.
+                        {t('Your stories deserve')}<br />{t('a living universe.')}
                     </h1>
                     <p className={styles.subtitle} data-landing-hero>
-                        LorePack is an interactive writing studio that co-creates stories with you —
-                        building lorebooks, tracking characters, and illustrating scenes as your narrative unfolds.
+                        {t('LorePack is an interactive writing studio that co-creates stories with you — building lorebooks, tracking characters, and illustrating scenes as your narrative unfolds.')}
                     </p>
                     <div className={styles.ctaGroup} data-landing-hero>
-                        <Link to="/auth" className={styles.ctaBtn}>Enter the Writing Desk</Link>
+                        <Link to="/auth" className={styles.ctaBtn}>{t('Enter the Writing Desk')}</Link>
                     </div>
                 </section>
 
@@ -318,8 +324,8 @@ export default function LandingPage() {
 
                 {/* ── How It Works ── */}
                 <section className={styles.howItWorks} data-scroll-reveal="how-it-works">
-                    <h2 className={styles.sectionTitle}>How It Works</h2>
-                    <p className={styles.sectionSubtitle}>Three steps from blank page to living world</p>
+                    <h2 className={styles.sectionTitle}>{t('How It Works')}</h2>
+                    <p className={styles.sectionSubtitle}>{t('Three steps from blank page to living world')}</p>
 
                     <div className={styles.steps}>
                         <div className={styles.step} data-landing-step>
@@ -327,8 +333,7 @@ export default function LandingPage() {
                             <div className={styles.stepContent}>
                                 <h3 className={styles.stepTitle}>Conjure Your World</h3>
                                 <p className={styles.stepDesc}>
-                                    Pick a genre, era, and protagonist archetype.
-                                    The wizard guides you through world setup in under a minute.
+                                    {t('Pick a genre, era, and protagonist archetype. The wizard guides you through world setup in under a minute.')}
                                 </p>
                             </div>
                         </div>
@@ -344,8 +349,7 @@ export default function LandingPage() {
                             <div className={styles.stepContent}>
                                 <h3 className={styles.stepTitle}>Write with an AI Co-Author</h3>
                                 <p className={styles.stepDesc}>
-                                    Give natural-language directions. The AI writes prose, auto-extracts
-                                    characters & locations into your lorebook, and keeps continuity tight.
+                                    {t('Give natural-language directions. The AI writes prose, auto-extracts characters & locations into your lorebook, and keeps continuity tight.')}
                                 </p>
                             </div>
                         </div>
@@ -361,8 +365,7 @@ export default function LandingPage() {
                             <div className={styles.stepContent}>
                                 <h3 className={styles.stepTitle}>Share & Crossover</h3>
                                 <p className={styles.stepDesc}>
-                                    Publish lorebook entries, discover other creators' worlds,
-                                    and propose crossover stories that merge your universes.
+                                    {t("Publish lorebook entries, discover other creators' worlds, and propose crossover stories that merge your universes.")}
                                 </p>
                             </div>
                         </div>
@@ -401,11 +404,10 @@ export default function LandingPage() {
                             </div>
                         </div>
                         <div className={styles.featureText} data-feature-text>
-                            <span className={styles.featureLabel}>The Writing Desk</span>
-                            <h3 className={styles.featureTitle}>A studio, not a chatbot</h3>
+                            <span className={styles.featureLabel}>{t('The Writing Desk')}</span>
+                            <h3 className={styles.featureTitle}>{t('A studio, not a chatbot')}</h3>
                             <p className={styles.featureDesc}>
-                                Split-pane workspace with your narrative on the left and a director's panel on the right.
-                                Give directions in plain language — the AI writes prose that stays consistent with your world.
+                                {t("Split-pane workspace with your narrative on the left and a director's panel on the right. Give directions in plain language — the AI writes prose that stays consistent with your world.")}
                             </p>
                         </div>
                     </div>
@@ -434,11 +436,10 @@ export default function LandingPage() {
                             </div>
                         </div>
                         <div className={styles.featureText} data-feature-text>
-                            <span className={styles.featureLabel}>The Archive</span>
-                            <h3 className={styles.featureTitle}>Your world, auto-organized</h3>
+                            <span className={styles.featureLabel}>{t('The Archive')}</span>
+                            <h3 className={styles.featureTitle}>{t('Your world, auto-organized')}</h3>
                             <p className={styles.featureDesc}>
-                                Characters, locations, magic systems — extracted and categorized automatically as you write.
-                                Edit, tag, and cross-reference entries like a personal wiki.
+                                {t('Characters, locations, magic systems — extracted and categorized automatically as you write. Edit, tag, and cross-reference entries like a personal wiki.')}
                             </p>
                         </div>
                     </div>
@@ -464,11 +465,10 @@ export default function LandingPage() {
                             </div>
                         </div>
                         <div className={styles.featureText} data-feature-text>
-                            <span className={styles.featureLabel}>The Crossroads</span>
-                            <h3 className={styles.featureTitle}>Worlds collide on purpose</h3>
+                            <span className={styles.featureLabel}>{t('The Crossroads')}</span>
+                            <h3 className={styles.featureTitle}>{t('Worlds collide on purpose')}</h3>
                             <p className={styles.featureDesc}>
-                                Browse public lorebooks from other creators. Propose crossovers — the AI evaluates
-                                compatibility and weaves your characters into shared adventures.
+                                {t('Browse public lorebooks from other creators. Propose crossovers — the AI evaluates compatibility and weaves your characters into shared adventures.')}
                             </p>
                         </div>
                     </div>
@@ -479,8 +479,8 @@ export default function LandingPage() {
                     <div data-scroll-reveal="divider" className={styles.sectionDivider}>
                         <Divider />
                     </div>
-                    <h2 className={styles.finalCtaTitle}>Your world is waiting.</h2>
-                    <Link to="/auth" className={styles.ctaBtn} data-cta-btn>Begin Your Tale</Link>
+                    <h2 className={styles.finalCtaTitle}>{t('Your world is waiting.')}</h2>
+                    <Link to="/auth" className={styles.ctaBtn} data-cta-btn>{t('Begin Your Tale')}</Link>
                 </section>
             </main>
 

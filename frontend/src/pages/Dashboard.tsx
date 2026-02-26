@@ -7,6 +7,7 @@ import type { Points, ShaderMaterial } from 'three';
 
 import { listPublicLorebooks, type PublicLorebook } from '../api';
 import { Card, SectionHeader, Tag } from '../components/ui';
+import { useI18n } from '../i18n';
 import { useAppStore } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
 import styles from './Dashboard.module.css';
@@ -18,19 +19,19 @@ function pseudoRandom(seed: number): number {
   return value - Math.floor(value);
 }
 
-function formatLabel(value: string): string {
-  if (!value) return 'Unknown';
+function formatLabel(value: string, unknownLabel: string): string {
+  if (!value) return unknownLabel;
   return value
     .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
 }
 
-function formatDate(value: string): string {
-  if (!value) return 'Unknown';
+function formatDate(value: string, dateLocale: string, unknownLabel: string): string {
+  if (!value) return unknownLabel;
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return new Intl.DateTimeFormat('zh-TW', {
+  return new Intl.DateTimeFormat(dateLocale, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -45,10 +46,10 @@ function getStatusProgress(status: string): number {
   return 45;
 }
 
-function getVisionTitle(characterName: string, sceneName: string): string {
+function getVisionTitle(characterName: string, sceneName: string, fallbackLabel: string): string {
   if (characterName) return characterName;
   if (sceneName) return sceneName;
-  return 'Untitled Vision';
+  return fallbackLabel;
 }
 
 function resolveImageUrl(primary: string | null | undefined, fallback: string): string | null {
@@ -138,13 +139,14 @@ function ParticleConstellation() {
   );
 }
 
-function getDisplayName(email: string | null | undefined): string {
-  if (!email) return 'Chronicler';
+function getDisplayName(email: string | null | undefined, fallbackLabel: string): string {
+  if (!email) return fallbackLabel;
   const local = email.split('@')[0];
   return local.charAt(0).toUpperCase() + local.slice(1);
 }
 
 export default function Dashboard() {
+  const { dateLocale, t } = useI18n();
   const user = useAuthStore((state) => state.user);
   const sessions = useAppStore((state) => state.sessions);
   const lorebooks = useAppStore((state) => state.lorebooks);
@@ -176,7 +178,7 @@ export default function Dashboard() {
         if (!cancelled) setPublicLorebooks(publicEntries);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load sanctum data.');
+          setError(err instanceof Error ? err.message : t('Failed to load sanctum data.'));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -187,7 +189,7 @@ export default function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [fetchImages, fetchLorebooks, fetchSessions]);
+  }, [fetchImages, fetchLorebooks, fetchSessions, t]);
 
   useEffect(() => {
     if (loading) return;
@@ -226,50 +228,49 @@ export default function Dashboard() {
       </div>
 
       <header className={styles.welcome} data-dashboard-reveal>
-        <p className={styles.kicker}>The Sanctum</p>
-        <h1 className={styles.title}>Welcome back, {getDisplayName(user?.email)}</h1>
+        <p className={styles.kicker}>{t('The Sanctum')}</p>
+        <h1 className={styles.title}>{t('Welcome back, {name}', { name: getDisplayName(user?.email, t('Chronicler')) })}</h1>
         <p className={styles.subtitle}>
-          Observe your active tales, curate your lorebooks, and follow the latest visions
-          shaping your world.
+          {t('Observe your active tales, curate your lorebooks, and follow the latest visions shaping your world.')}
         </p>
       </header>
 
       {error ? (
         <div className={styles.errorBanner} data-dashboard-reveal>
-          Failed to sync sanctum data: {error}
+          {t('Failed to sync sanctum data: {error}', { error })}
         </div>
       ) : null}
 
       {loading ? (
         <Card hoverable={false} className={styles.loadingCard}>
-          <p>Attuning the sanctum...</p>
+          <p>{t('Attuning the sanctum...')}</p>
         </Card>
       ) : (
         <>
           <section className={styles.section} data-dashboard-reveal>
-            <SectionHeader title="Active Tales">
+            <SectionHeader title={t('Active Tales')}>
               <Link to="/story-studio" className={styles.sectionLink}>
-                Open Writing Desk
+                {t('Open Writing Desk')}
               </Link>
             </SectionHeader>
 
             <div className={styles.gridThree}>
               {activeSessions.length === 0 ? (
                 <Card hoverable={false} className={styles.emptyCard}>
-                  <p>No active story sessions yet.</p>
-                  <p className={styles.mutedText}>Begin a new conjuration to awaken your first tale.</p>
+                  <p>{t('No active story sessions yet.')}</p>
+                  <p className={styles.mutedText}>{t('Begin a new conjuration to awaken your first tale.')}</p>
                 </Card>
               ) : (
                 activeSessions.map((session) => (
                   <Link key={session.id} to={`/story-studio?session=${session.id}`} className={styles.cardLink}>
                     <Card className={styles.taleCard} data-dashboard-card>
                       <div className={styles.cardHeader}>
-                        <Tag label={formatLabel(session.genre)} selected />
-                        <Tag label={formatLabel(session.status)} />
+                        <Tag label={formatLabel(session.genre, t('Unknown'))} selected />
+                        <Tag label={formatLabel(session.status, t('Unknown'))} />
                       </div>
-                      <h3 className={styles.cardTitle}>{formatLabel(session.genre)} · {formatLabel(session.world_era)}</h3>
+                      <h3 className={styles.cardTitle}>{formatLabel(session.genre, t('Unknown'))} · {formatLabel(session.world_era, t('Unknown'))}</h3>
                       <p className={styles.mutedText}>Lorebook {session.lorebook_id}</p>
-                      <p className={styles.metaText}>Last edited {formatDate(session.updated_at)}</p>
+                      <p className={styles.metaText}>{t('Last edited {time}', { time: formatDate(session.updated_at, dateLocale, t('Unknown')) })}</p>
                       <div className={styles.progressTrack}>
                         <div
                           className={styles.progressFill}
@@ -284,9 +285,9 @@ export default function Dashboard() {
           </section>
 
           <section className={styles.section} data-dashboard-reveal>
-            <SectionHeader title="Your Lorebooks">
+            <SectionHeader title={t('Your Lorebooks')}>
               <Link to="/lorebook" className={styles.sectionLink}>
-                Open Archive
+                {t('Open Archive')}
               </Link>
             </SectionHeader>
 
@@ -295,28 +296,28 @@ export default function Dashboard() {
                 <Link key={lorebook.id} to={`/lorebook?id=${lorebook.id}`} className={styles.cardLink}>
                   <Card className={styles.lorebookCard} data-dashboard-card>
                     <div className={styles.cardHeader}>
-                      <Tag label={formatLabel(lorebook.genre)} />
+                      <Tag label={formatLabel(lorebook.genre, t('Unknown'))} />
                     </div>
                     <h3 className={styles.cardTitle}>{lorebook.title}</h3>
-                    <p className={styles.mutedText}>{lorebook.description || 'No description yet.'}</p>
-                    <p className={styles.metaText}>{lorebook.entry_count} entries recorded</p>
+                    <p className={styles.mutedText}>{lorebook.description || t('No description yet.')}</p>
+                    <p className={styles.metaText}>{t('{count} entries recorded', { count: lorebook.entry_count })}</p>
                   </Card>
                 </Link>
               ))}
 
               <Link to="/lorebook" className={styles.newLorebookLink}>
                 <Card className={styles.newLorebookCard} data-dashboard-card>
-                  <h3 className={styles.cardTitle}>+ New</h3>
-                  <p className={styles.mutedText}>Create another codex section for your worlds.</p>
+                  <h3 className={styles.cardTitle}>{t('+ New')}</h3>
+                  <p className={styles.mutedText}>{t('Create another codex section for your worlds.')}</p>
                 </Card>
               </Link>
             </div>
           </section>
 
           <section className={styles.section} data-dashboard-reveal>
-            <SectionHeader title="Recent Visions">
+            <SectionHeader title={t('Recent Visions')}>
               <Link to="/gallery" className={styles.sectionLink}>
-                Open Gallery
+                {t('Open Gallery')}
               </Link>
             </SectionHeader>
 
@@ -327,24 +328,24 @@ export default function Dashboard() {
                     <img
                       className={styles.heroVisionImage}
                       src={resolveImageUrl(heroVision.signed_url, heroVision.gs_uri) || ''}
-                      alt={getVisionTitle(heroVision.character_name, heroVision.scene_name)}
+                      alt={getVisionTitle(heroVision.character_name, heroVision.scene_name, t('Untitled Vision'))}
                       loading="lazy"
                     />
                   ) : (
-                    <div className={styles.visionFallback}>Vision pending signed URL</div>
+                    <div className={styles.visionFallback}>{t('Vision pending signed URL')}</div>
                   )}
                   <div className={styles.heroOverlay}>
                     <h3 className={styles.cardTitle}>
-                      {getVisionTitle(heroVision.character_name, heroVision.scene_name)}
+                      {getVisionTitle(heroVision.character_name, heroVision.scene_name, t('Untitled Vision'))}
                     </h3>
-                    <p className={styles.mutedText}>{heroVision.prompt_used || 'No prompt metadata.'}</p>
+                    <p className={styles.mutedText}>{heroVision.prompt_used || t('No prompt metadata.')}</p>
                   </div>
                 </Card>
 
                 <div className={styles.thumbColumn}>
                   {thumbVisions.length === 0 ? (
                     <Card hoverable={false} className={styles.emptyCard}>
-                      <p>No additional visions yet.</p>
+                      <p>{t('No additional visions yet.')}</p>
                     </Card>
                   ) : (
                     thumbVisions.map((vision) => {
@@ -352,17 +353,17 @@ export default function Dashboard() {
                       return (
                         <Card key={vision.id} className={styles.thumbCard} data-dashboard-card>
                           {src ? (
-                            <img
-                              className={styles.thumbImage}
-                              src={src}
-                              alt={getVisionTitle(vision.character_name, vision.scene_name)}
-                              loading="lazy"
-                            />
+                              <img
+                                className={styles.thumbImage}
+                                src={src}
+                                alt={getVisionTitle(vision.character_name, vision.scene_name, t('Untitled Vision'))}
+                                loading="lazy"
+                              />
                           ) : (
                             <div className={styles.thumbFallback} />
                           )}
                           <p className={styles.thumbLabel}>
-                            {getVisionTitle(vision.character_name, vision.scene_name)}
+                            {getVisionTitle(vision.character_name, vision.scene_name, t('Untitled Vision'))}
                           </p>
                         </Card>
                       );
@@ -372,33 +373,33 @@ export default function Dashboard() {
               </div>
             ) : (
               <Card hoverable={false} className={styles.emptyCard}>
-                <p>No generated visions yet.</p>
-                <p className={styles.mutedText}>Generate a character or scene image to illuminate this section.</p>
+                <p>{t('No generated visions yet.')}</p>
+                <p className={styles.mutedText}>{t('Generate a character or scene image to illuminate this section.')}</p>
               </Card>
             )}
           </section>
 
           <section className={styles.section} data-dashboard-reveal>
-            <SectionHeader title="Whispers from Afar">
+            <SectionHeader title={t('Whispers from Afar')}>
               <Link to="/crossroads" className={styles.sectionLink}>
-                Enter Crossroads
+                {t('Enter Crossroads')}
               </Link>
             </SectionHeader>
 
             <Card className={styles.whispersCard} data-dashboard-card>
               {publicLorebooks.length === 0 ? (
                 <p className={styles.mutedText}>
-                  No public lorebooks detected yet. The roads are quiet for now.
+                  {t('No public lorebooks detected yet. The roads are quiet for now.')}
                 </p>
               ) : (
                 <>
                   <p className={styles.whisperHeadline}>
-                    {publicLorebooks.length} public worlds are available for discovery.
+                    {t('{count} public worlds are available for discovery.', { count: publicLorebooks.length })}
                   </p>
                   <ul className={styles.whisperList}>
                     {publicLorebooks.slice(0, 3).map((item) => (
                       <li key={item.id}>
-                        {item.title} · {item.public_entry_count} public entries
+                        {item.title} · {t('{count} public entries', { count: item.public_entry_count })}
                       </li>
                     ))}
                   </ul>

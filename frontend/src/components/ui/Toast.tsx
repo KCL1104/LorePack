@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 
 import type { Toast as ToastState } from '../../api/types';
+import { useI18n } from '../../i18n';
 import styles from './Toast.module.css';
 
 interface ToastProps {
@@ -9,6 +10,8 @@ interface ToastProps {
 }
 
 export function Toast({ toast, onDismiss }: ToastProps) {
+  const { t } = useI18n();
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       onDismiss(toast.id);
@@ -30,7 +33,7 @@ export function Toast({ toast, onDismiss }: ToastProps) {
         type="button"
         className={styles.dismiss}
         onClick={() => onDismiss(toast.id)}
-        aria-label="Dismiss notification"
+        aria-label={t('Dismiss notification')}
       >
         ×
       </button>

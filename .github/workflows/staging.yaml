@@ -126,7 +126,7 @@ jobs:
           image: '${{ vars.REGION }}-docker.pkg.dev/${{ vars.STAGING_PROJECT_ID }}/lorepack-repo/lorepack-api:${{ github.sha }}'
           env_vars: |
             GOOGLE_CLOUD_PROJECT=${{ vars.STAGING_PROJECT_ID }}
-            ALLOWED_ORIGINS=${{ vars.VITE_API_URL_STAGING }}
+            ALLOWED_ORIGINS=${{ vars.FRONTEND_URL_STAGING }}
             COMMIT_SHA=${{ github.sha }}
 
   deploy_frontend_staging:

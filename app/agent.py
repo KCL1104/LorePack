@@ -36,10 +36,15 @@ async def _log_agent_call(callback_context):
     return None
 
 
-_, project_id = google.auth.default()
-os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
-os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
+os.environ.setdefault("GOOGLE_CLOUD_LOCATION", "global")
 os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "True"
+if not os.environ.get("GOOGLE_CLOUD_PROJECT"):
+    try:
+        _, _project_id = google.auth.default()
+        if _project_id:
+            os.environ["GOOGLE_CLOUD_PROJECT"] = _project_id
+    except Exception:
+        pass
 
 
 def request_user_input(message: str) -> dict:

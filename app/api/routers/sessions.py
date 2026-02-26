@@ -366,6 +366,13 @@ async def delete_session(
             ch.reference.delete()
         db.collection("stories").document(lorebook_id).delete()
 
+        lorebook_ref = db.collection("lorebooks").document(lorebook_id)
+        lorebook_snap = lorebook_ref.get()
+        if lorebook_snap.exists and lorebook_snap.to_dict().get("owner_uid") == current_user.uid:
+            for entry in lorebook_ref.collection("entries").stream():
+                entry.reference.delete()
+            lorebook_ref.delete()
+
     # Delete session
     db.collection("story_sessions").document(session_id).delete()
 

@@ -15,10 +15,18 @@ import { useAuthStore } from './stores/authStore';
 
 export default function App() {
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
+  const authReady = useAuthStore((state) => state.authReady);
+  const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
     initializeAuth();
   }, [initializeAuth]);
+
+  const rootElement = !authReady
+    ? <div style={{ padding: '2rem', color: '#f6e8c8' }}>Checking authentication...</div>
+    : user
+      ? <Navigate to="/dashboard" replace />
+      : <LandingPage />;
 
   return (
     <ErrorBoundary>
@@ -35,7 +43,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>
         </Route>
-        <Route path="/" element={<LandingPage />} />
+        <Route path="/" element={rootElement} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

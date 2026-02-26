@@ -343,6 +343,8 @@ export default function StoryStudio() {
   const [loadingSession, setLoadingSession] = useState(false);
   const [suggestedTitles, setSuggestedTitles] = useState<string[]>([]);
   const [suggestingTitles, setSuggestingTitles] = useState(false);
+  const [pendingDeleteSessionId, setPendingDeleteSessionId] = useState<string | null>(null);
+  const [deletingSession, setDeletingSession] = useState(false);
 
   const stepDirectionRef = useRef(1);
   const previousStepRef = useRef(0);
@@ -966,15 +968,28 @@ export default function StoryStudio() {
     }
   };
 
-  const handleDeleteSession = async (sid: string, event: React.MouseEvent) => {
+  const handleDeleteSession = (sid: string, event: React.MouseEvent) => {
     event.stopPropagation();
-    if (!confirm(t('Are you sure you want to delete this story? This cannot be undone.'))) return;
+    setPendingDeleteSessionId(sid);
+  };
+
+  const closeDeleteDialog = () => {
+    if (deletingSession) return;
+    setPendingDeleteSessionId(null);
+  };
+
+  const handleConfirmDeleteSession = async () => {
+    if (!pendingDeleteSessionId || deletingSession) return;
+    setDeletingSession(true);
     try {
-      await deleteSession(sid);
+      await deleteSession(pendingDeleteSessionId);
       await fetchSessions();
       addToast({ variant: 'success', message: t('Story deleted.') });
     } catch {
       addToast({ variant: 'error', message: t('Failed to delete story.') });
+    } finally {
+      setDeletingSession(false);
+      setPendingDeleteSessionId(null);
     }
   };
 
@@ -1290,6 +1305,10 @@ export default function StoryStudio() {
     });
   };
 
+  const pendingDeleteSession = pendingDeleteSessionId
+    ? sessions.find((session) => session.id === pendingDeleteSessionId) || null
+    : null;
+
   return (
     <div className={styles.page}>
       {isGenerating && phase === 'desk' ? (
@@ -1301,6 +1320,44 @@ export default function StoryStudio() {
             <span className={styles.loadingIcon}>✦</span>
             <p className={styles.loadingText}>{statusText}</p>
           </div>
+        </div>
+      ) : null}
+
+      {pendingDeleteSessionId ? (
+        <div className={styles.deleteDialogBackdrop} onClick={closeDeleteDialog}>
+          <Card
+            hoverable={false}
+            className={styles.deleteDialog}
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-story-title"
+          >
+            <h3 id="delete-story-title" className={styles.deleteDialogTitle}>
+              {t('Delete this story?')}
+            </h3>
+            <p className={styles.deleteDialogText}>
+              {pendingDeleteSession?.title
+                ? `${pendingDeleteSession.title}`
+                : t('This will remove the selected story from your archive.')}
+            </p>
+            <p className={styles.deleteDialogText}>
+              {t('The story session and its lorebook data will be removed. This cannot be undone.')}
+            </p>
+            <div className={styles.deleteDialogActions}>
+              <Button variant="ghost" onClick={closeDeleteDialog} disabled={deletingSession}>
+                {t('Cancel')}
+              </Button>
+              <Button
+                onClick={() => {
+                  void handleConfirmDeleteSession();
+                }}
+                disabled={deletingSession}
+              >
+                {deletingSession ? t('Deleting...') : t('Delete Story')}
+              </Button>
+            </div>
+          </Card>
         </div>
       ) : null}
 
@@ -1352,7 +1409,7 @@ export default function StoryStudio() {
                         </p>
                         <Button
                           variant="ghost"
-                          onClick={(e) => { void handleDeleteSession(s.id, e); }}
+                          onClick={(e) => handleDeleteSession(s.id, e)}
                         >
                           ✕
                         </Button>

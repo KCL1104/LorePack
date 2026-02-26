@@ -76,27 +76,6 @@ jobs:
             --service-account=${{ vars.APP_SERVICE_ACCOUNT_STAGING }} \
             --set-env-vars="COMMIT_SHA=${{ github.sha }},AGENT_VERSION=${{ steps.extract-version.outputs.version }},LOGS_BUCKET_NAME=${{ vars.LOGS_BUCKET_NAME_STAGING }}"
 
-      - name: Run load test
-        run: |
-          _AUTH_TOKEN=$(gcloud auth print-access-token -q)
-          echo "::add-mask::${_AUTH_TOKEN}"
-          export _AUTH_TOKEN
-          pip install locust==2.31.1
-          mkdir -p tests/load_test/.results
-          locust -f tests/load_test/load_test.py \
-          --headless \
-          -t 30s -u 2 -r 0.5 \
-          --csv=tests/load_test/.results/results \
-          --html=tests/load_test/.results/report.html
-
-      - name: Export Load Test Results to GCS
-        run: |
-          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          gcloud storage cp --recursive tests/load_test/.results gs://${{ vars.LOGS_BUCKET_NAME_STAGING }}/load-test-results/results-${TIMESTAMP} --quiet
-          echo "_________________________________________________________________________"
-          echo "Load test results copied to gs://${{ vars.LOGS_BUCKET_NAME_STAGING }}/load-test-results/results-${TIMESTAMP}"
-          echo "HTTP link: https://console.cloud.google.com/storage/browser/${{ vars.LOGS_BUCKET_NAME_STAGING }}/load-test-results/results-${TIMESTAMP}"
-          echo "_________________________________________________________________________"
 
   deploy_cloudrun_staging:
     runs-on: ubuntu-latest

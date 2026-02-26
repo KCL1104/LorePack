@@ -198,7 +198,7 @@ See the [deployment guide](https://googlecloudplatform.github.io/agent-starter-p
 
 ## Known Limitations
 
-- **In-memory sessions** — The local dev server uses `InMemorySessionService` from Google ADK, meaning all active story sessions are lost on server restart. For production, swap to a persistent session backend (e.g. Firestore-backed `DatabaseSessionService`).
+- **Session durability scope** — The API now defaults to ADK `DatabaseSessionService` (`LOREPACK_SESSION_DB_URL`, default: `sqlite:////tmp/lorepack_sessions.db`) instead of in-memory sessions. This survives process restarts on the same instance, but for true cross-instance durability in production you should point `LOREPACK_SESSION_DB_URL` to a managed persistent database.
 - **Imagen availability** — Image generation requires Vertex AI Imagen API access. If your project hasn't enabled the API or lacks quota, image features will fail gracefully.
 
 ---

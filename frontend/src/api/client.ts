@@ -9,6 +9,7 @@ import type {
   SessionSummary,
   SessionDetail,
   ConjureParams,
+  ExampleStorySeed,
   GenerateImageParams,
   PublicLorebook,
   ImportResult,
@@ -145,10 +146,12 @@ export async function validateLorebook(
 
 // Gallery
 export async function listImages(
-  filters?: { asset_type?: string },
+  filters?: { asset_type?: string; lorebook_id?: string; include_signed_url?: boolean },
 ): Promise<ImageAsset[]> {
   const params = new URLSearchParams();
   if (filters?.asset_type) params.set('asset_type', filters.asset_type);
+  if (filters?.lorebook_id) params.set('lorebook_id', filters.lorebook_id);
+  if (filters?.include_signed_url) params.set('include_signed_url', 'true');
   const qs = params.toString();
   return fetchApi<ImageAsset[]>(`/gallery${qs ? `?${qs}` : ''}`);
 }
@@ -164,6 +167,10 @@ export async function listSessions(): Promise<SessionSummary[]> {
 
 export async function getSession(id: string): Promise<SessionDetail> {
   return fetchApi<SessionDetail>(`/sessions/${id}`);
+}
+
+export async function listExampleStories(): Promise<ExampleStorySeed[]> {
+  return fetchApi<ExampleStorySeed[]>('/sessions/examples');
 }
 
 // Collaboration
@@ -209,13 +216,59 @@ export async function* streamSSE(
   body: object,
   options?: SSEOptions,
 ): AsyncGenerator<SSEEvent> {
-  const headers = await buildHeaders({ 'Content-Type': 'application/json' });
+  const CONNECT_RETRY_DELAYS_MS = [700, 1400];
+  const wait = (ms: number) =>
+    new Promise<void>((resolve) => {
+      globalThis.setTimeout(resolve, ms);
+    });
 
-  const response = await fetch(buildApiUrl(path), {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-  });
+  const parseSSEBlock = (block: string): SSEEvent[] => {
+    const dataLines = block
+      .split('\n')
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.replace(/^data:\s?/, ''));
+
+    if (dataLines.length === 0) return [];
+
+    const payload = dataLines.join('\n').trim();
+    if (!payload) return [];
+
+    try {
+      const parsed = JSON.parse(payload) as SSEEvent;
+      if (!parsed?.type) {
+        return [{ type: 'error', message: 'Malformed SSE event (missing type).', retryable: false }];
+      }
+      return [parsed];
+    } catch {
+      return [{ type: 'error', message: 'Malformed SSE payload received.', retryable: false }];
+    }
+  };
+
+  const headers = await buildHeaders({ 'Content-Type': 'application/json' });
+  let response: Response | null = null;
+  let connectError: unknown;
+
+  for (let attempt = 0; attempt <= CONNECT_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      response = await fetch(buildApiUrl(path), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+      break;
+    } catch (err) {
+      connectError = err;
+      if (attempt >= CONNECT_RETRY_DELAYS_MS.length) {
+        break;
+      }
+      await wait(CONNECT_RETRY_DELAYS_MS[attempt]);
+    }
+  }
+
+  if (!response) {
+    const message = connectError instanceof Error ? connectError.message : 'Unable to connect to stream.';
+    throw new Error(`SSE connection failed: ${message}`);
+  }
 
   if (response.status === 401) {
     unauthorizedHandler?.();
@@ -228,20 +281,43 @@ export async function* streamSSE(
 
   options?.onOpen?.(response);
 
-  const reader = response.body!.getReader();
+  if (!response.body) {
+    throw new Error('SSE response stream was unavailable.');
+  }
+
+  const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n\n');
-    buffer = lines.pop() || '';
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        yield JSON.parse(line.slice(6)) as SSEEvent;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const blocks = buffer.split('\n\n');
+      buffer = blocks.pop() || '';
+      for (const block of blocks) {
+        const events = parseSSEBlock(block);
+        for (const event of events) {
+          yield event;
+        }
       }
+    }
+
+    if (buffer.trim()) {
+      const trailingEvents = parseSSEBlock(buffer);
+      for (const event of trailingEvents) {
+        yield event;
+      }
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown streaming error.';
+    throw new Error(`SSE stream interrupted: ${message}`);
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {
+      // no-op
     }
   }
 }

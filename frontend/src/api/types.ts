@@ -50,7 +50,10 @@ export interface ImageAsset {
   scene_name: string;
   prompt_used: string;
   gs_uri: string;
+  signed_url?: string | null;
   art_style: string;
+  pose?: string;
+  mood?: string;
   generated_at: string;
 }
 
@@ -107,6 +110,21 @@ export interface ConjureParams {
   writing_style?: string;
 }
 
+export interface ExampleStorySeed {
+  id: string;
+  title: string;
+  description: string;
+  genre: string;
+  world_era: string;
+  world_essence: string[];
+  protagonist_archetype: string;
+  protagonist_virtues: string[];
+  protagonist_shadow: string;
+  spark: string;
+  chapter_length: 'short' | 'medium' | 'long';
+  writing_style: string;
+}
+
 export interface GenerateImageParams {
   lorebook_id: string;
   entry_name: string;
@@ -156,9 +174,11 @@ export interface LorebookValidation {
 export type EnrichTask = 'backstory' | 'expand' | 'relationships' | 'personality';
 
 export interface SSEEvent {
-  type: 'thinking' | 'text_chunk' | 'image_generated' | 'lore_cited' | 'lorebook_updated' | 'done';
+  type: 'thinking' | 'text_chunk' | 'image_generated' | 'lore_cited' | 'lorebook_updated' | 'done' | 'error';
   text?: string;
   full_text?: string;
+  message?: string;
+  retryable?: boolean;
   // lorebook_updated
   entry_name?: string;
   category?: string;

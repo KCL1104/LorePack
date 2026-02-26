@@ -22,7 +22,9 @@ interface AuthState {
   loading: boolean;
   user: User | null;
   idToken: string | null;
+  googleLinkState: 'idle' | 'awaiting_password';
   pendingGoogleLinkEmail: string | null;
+  pendingGoogleCredential: OAuthCredential | null;
   initializeAuth: () => void;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
@@ -32,16 +34,16 @@ interface AuthState {
 }
 
 let unsubscribeAuth: (() => void) | null = null;
-let pendingGoogleCredential: OAuthCredential | null = null;
 
 function mapAuthError(err: unknown): Error {
   if (err instanceof Error) return err;
   return new Error('Authentication failed.');
 }
 
-async function tryLinkGoogleCredential(user: User): Promise<void> {
-  if (!pendingGoogleCredential) return;
-
+async function tryLinkGoogleCredential(
+  user: User,
+  pendingGoogleCredential: OAuthCredential,
+): Promise<void> {
   try {
     await linkWithCredential(user, pendingGoogleCredential);
   } catch (err) {
@@ -49,8 +51,6 @@ async function tryLinkGoogleCredential(user: User): Promise<void> {
     if (code !== 'auth/provider-already-linked' && code !== 'auth/credential-already-in-use') {
       throw err;
     }
-  } finally {
-    pendingGoogleCredential = null;
   }
 }
 
@@ -60,7 +60,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   loading: false,
   user: null,
   idToken: null,
+  googleLinkState: 'idle',
   pendingGoogleLinkEmail: null,
+  pendingGoogleCredential: null,
 
   initializeAuth: () => {
     if (get().initialized) return;
@@ -81,8 +83,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     });
 
     setUnauthorizedHandler(() => {
-      pendingGoogleCredential = null;
-      set({ user: null, idToken: null, pendingGoogleLinkEmail: null });
+      set({
+        user: null,
+        idToken: null,
+        googleLinkState: 'idle',
+        pendingGoogleLinkEmail: null,
+        pendingGoogleCredential: null,
+      });
       void signOut(auth).catch(() => undefined);
     });
 
@@ -123,7 +130,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     try {
       await createUserWithEmailAndPassword(auth, normalizedEmail, password);
-      set({ pendingGoogleLinkEmail: null });
+      set({
+        googleLinkState: 'idle',
+        pendingGoogleLinkEmail: null,
+        pendingGoogleCredential: null,
+      });
     } catch (err) {
       const code = (err as { code?: string })?.code;
 
@@ -168,9 +179,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const result = await signInWithEmailAndPassword(auth, normalizedEmail, password);
 
       const pendingEmail = get().pendingGoogleLinkEmail;
+      const pendingGoogleCredential = get().pendingGoogleCredential;
       if (pendingGoogleCredential && pendingEmail && pendingEmail === normalizedEmail) {
-        await tryLinkGoogleCredential(result.user);
-        set({ pendingGoogleLinkEmail: null });
+        await tryLinkGoogleCredential(result.user, pendingGoogleCredential);
+        set({
+          googleLinkState: 'idle',
+          pendingGoogleLinkEmail: null,
+          pendingGoogleCredential: null,
+        });
       }
     } catch (err) {
       throw mapAuthError(err);
@@ -181,8 +197,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   signInWithGoogle: async () => {
     const auth = getFirebaseAuth();
-    set({ loading: true, pendingGoogleLinkEmail: null });
-    pendingGoogleCredential = null;
+    set({
+      loading: true,
+      googleLinkState: 'idle',
+      pendingGoogleLinkEmail: null,
+      pendingGoogleCredential: null,
+    });
 
     try {
       await signInWithPopup(auth, getGoogleProvider());
@@ -198,8 +218,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           const methods = await fetchSignInMethodsForEmail(auth, normalizedEmail);
 
           if (methods.includes(EmailAuthProvider.PROVIDER_ID)) {
-            pendingGoogleCredential = pendingCredential;
-            set({ pendingGoogleLinkEmail: normalizedEmail });
+            set({
+              googleLinkState: 'awaiting_password',
+              pendingGoogleLinkEmail: normalizedEmail,
+              pendingGoogleCredential: pendingCredential,
+            });
             throw new Error('This email already has a password account. Sign in once with password to auto-link Google.');
           }
         }
@@ -222,9 +245,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ loading: true });
 
     try {
-      pendingGoogleCredential = null;
       await signOut(auth);
-      set({ pendingGoogleLinkEmail: null });
+      set({
+        googleLinkState: 'idle',
+        pendingGoogleLinkEmail: null,
+        pendingGoogleCredential: null,
+      });
     } finally {
       set({ loading: false });
     }

@@ -237,6 +237,14 @@ async def list_sessions(current_user: CurrentUser):
     return sessions
 
 
+@router.get("/examples")
+async def list_example_stories(current_user: CurrentUser):
+    """List curated example story seeds for onboarding."""
+    from app.seeds.example_stories import EXAMPLE_STORIES
+
+    return EXAMPLE_STORIES
+
+
 @router.get("/{session_id}")
 async def get_session(
     session_id: str,

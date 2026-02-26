@@ -6,7 +6,6 @@ import {
   deleteEntry,
   enrichEntry,
   generateImage,
-  getImage,
   listImages,
   updateEntry,
   updateLorebookMeta,
@@ -184,7 +183,7 @@ export default function LorebookEditor() {
       setError(null);
       try {
         await fetchLorebooks();
-        const characterAssets = await listImages({ asset_type: 'character' });
+        const characterAssets = await listImages({ asset_type: 'character', include_signed_url: true });
         if (!cancelled) {
           setPortraitAssets(characterAssets);
         }
@@ -286,17 +285,9 @@ export default function LorebookEditor() {
 
       if (!matched) return;
 
-      try {
-        const detail = await getImage(matched.id);
-        const candidate = detail.signed_url || detail.gs_uri;
-        if (!cancelled && candidate && candidate.startsWith('http')) {
-          setPortraitUrl(candidate);
-        }
-      } catch {
-        const fallback = matched.gs_uri;
-        if (!cancelled && fallback.startsWith('http')) {
-          setPortraitUrl(fallback);
-        }
+      const candidate = matched.signed_url || matched.gs_uri;
+      if (!cancelled && candidate && candidate.startsWith('http')) {
+        setPortraitUrl(candidate);
       }
     };
 
@@ -791,7 +782,7 @@ export default function LorebookEditor() {
                               if (event.type === 'done') break;
                             }
                             addToast({ variant: 'success', message: `Image generated for ${selectedEntry.name}` });
-                            const freshAssets = await listImages({ asset_type: 'character' });
+                            const freshAssets = await listImages({ asset_type: 'character', include_signed_url: true });
                             setPortraitAssets(freshAssets);
                           } catch (err) {
                             addToast({ variant: 'error', message: err instanceof Error ? err.message : 'Image generation failed.' });

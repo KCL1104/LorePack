@@ -21,10 +21,10 @@ from dotenv import load_dotenv
 from google.adk.a2a.executor.a2a_agent_executor import A2aAgentExecutor
 from google.adk.artifacts import GcsArtifactService, InMemoryArtifactService
 from google.adk.runners import Runner
-from google.adk.sessions import InMemorySessionService
 from vertexai.preview.reasoning_engines import A2aAgent
 
 from app.agent import app as adk_app
+from app.app_utils.session_service import get_session_service
 from app.app_utils.telemetry import setup_telemetry
 from app.app_utils.typing import Feedback
 
@@ -113,9 +113,10 @@ def _build_agent_card() -> AgentCard:
 def _create_runner() -> Runner:
     """Create a Runner for the A2A executor."""
     logs_bucket_name = os.environ.get("LOGS_BUCKET_NAME")
+    session_service = get_session_service(logger=logging.getLogger("lorepack.agent_engine"))
     return Runner(
         app=adk_app,
-        session_service=InMemorySessionService(),
+        session_service=session_service,
         artifact_service=(
             GcsArtifactService(bucket_name=logs_bucket_name)
             if logs_bucket_name

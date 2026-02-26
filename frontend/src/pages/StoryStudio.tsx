@@ -4,7 +4,16 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { animate, stagger } from 'animejs';
 import type { ShaderMaterial } from 'three';
 
-import { conjureSession, getSession as fetchSessionDetail, sendMessage, type ConjureParams, type SSEEvent, type SessionDetail } from '../api';
+import {
+  conjureSession,
+  getSession as fetchSessionDetail,
+  listExampleStories,
+  sendMessage,
+  type ConjureParams,
+  type ExampleStorySeed,
+  type SSEEvent,
+  type SessionDetail,
+} from '../api';
 import { Button, Card, Input, SectionHeader, Tag } from '../components/ui';
 import { useAppStore } from '../stores/appStore';
 import styles from './StoryStudio.module.css';
@@ -148,7 +157,7 @@ const WRITING_STYLES: SelectOption[] = [
   { id: 'poetic_prose', label: 'Poetic Prose', description: 'Lyrical, metaphor-rich, atmospheric.' },
 ];
 
-const RANDOM_SPARKS = [
+const DEFAULT_SPARKS = [
   'An eclipse seals the city gates, and only one bloodline can open them again.',
   'A forbidden atlas reveals lands that appear only when no one remembers them.',
   'A royal heir wakes with memories of a war that has not happened yet.',
@@ -286,6 +295,7 @@ export default function StoryStudio() {
   const [phase, setPhase] = useState<'select' | 'conjure' | 'desk'>('select');
   const [stepIndex, setStepIndex] = useState(0);
   const [form, setForm] = useState<ConjureForm>(INITIAL_FORM);
+  const [exampleStories, setExampleStories] = useState<ExampleStorySeed[]>([]);
 
   const [sessionId, setSessionId] = useState('');
   const [lorebookId, setLorebookId] = useState('');
@@ -325,6 +335,28 @@ export default function StoryStudio() {
   useEffect(() => {
     void fetchSessions();
   }, [fetchSessions]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadExampleStories = async () => {
+      try {
+        const seeds = await listExampleStories();
+        if (!cancelled) {
+          setExampleStories(seeds);
+        }
+      } catch {
+        if (!cancelled) {
+          setExampleStories([]);
+        }
+      }
+    };
+
+    void loadExampleStories();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Auto-resume from ?session= query param (e.g. clicked from Dashboard)
   useEffect(() => {
@@ -555,71 +587,93 @@ export default function StoryStudio() {
     let streamBuffer = '';
     const streamLoreRefs = new Set<string>();
     const streamImages: ChapterImage[] = [];
+    let completed = false;
 
-    for await (const event of stream) {
-      if (event.type === 'thinking') {
-        if (event.text) setStatusText(event.text);
-      }
-
-      if (event.type === 'text_chunk' && event.text) {
-        streamBuffer += event.text;
-        updateChatMessageText(aiMessageId, streamBuffer);
-      }
-
-      if (event.type === 'lore_cited' && event.entries) {
-        for (const name of event.entries) {
-          streamLoreRefs.add(name);
+    try {
+      for await (const event of stream) {
+        if (event.type === 'error') {
+          throw new Error(event.message || 'Narrative stream failed.');
         }
-      }
 
-      if (event.type === 'lorebook_updated') {
-        recordLoreUpdate(event);
-      }
+        if (event.type === 'thinking') {
+          if (event.text) setStatusText(event.text);
+        }
 
-      if (event.type === 'image_generated' && event.gs_uri) {
-        streamImages.push({
-          gs_uri: event.gs_uri,
-          mime_type: event.mime_type || 'image/png',
-          index: event.index ?? streamImages.length,
-        });
-      }
+        if (event.type === 'text_chunk' && event.text) {
+          streamBuffer += event.text;
+          updateChatMessageText(aiMessageId, streamBuffer);
+        }
 
-      if (event.type === 'done') {
-        const finalText = (event.full_text || streamBuffer).trim();
-        updateChatMessageText(aiMessageId, finalText || 'No response text was returned by the director.');
+        if (event.type === 'lore_cited' && event.entries) {
+          for (const name of event.entries) {
+            streamLoreRefs.add(name);
+          }
+        }
 
-        if (finalText) {
-          if (mode === 'conjure') {
-            setWorldPreview({
-              text: finalText,
-              loreRefs: Array.from(streamLoreRefs),
-              images: streamImages,
-            });
-          } else if (mode === 'chapter') {
-            setChapters((prev) => [
-              ...prev,
-              {
-                id: createId('chapter'),
-                title: `Chapter ${Math.max(prev.length, 1)}`,
-                body: finalText,
+        if (event.type === 'lorebook_updated') {
+          recordLoreUpdate(event);
+        }
+
+        if (event.type === 'image_generated' && event.gs_uri) {
+          streamImages.push({
+            gs_uri: event.gs_uri,
+            mime_type: event.mime_type || 'image/png',
+            index: event.index ?? streamImages.length,
+          });
+        }
+
+        if (event.type === 'done') {
+          completed = true;
+          const finalText = (event.full_text || streamBuffer).trim();
+          updateChatMessageText(aiMessageId, finalText || 'No response text was returned by the director.');
+
+          if (finalText) {
+            if (mode === 'conjure') {
+              setWorldPreview({
+                text: finalText,
                 loreRefs: Array.from(streamLoreRefs),
                 images: streamImages,
-              },
-            ]);
+              });
+            } else if (mode === 'chapter') {
+              setChapters((prev) => [
+                ...prev,
+                {
+                  id: createId('chapter'),
+                  title: `Chapter ${Math.max(prev.length, 1)}`,
+                  body: finalText,
+                  loreRefs: Array.from(streamLoreRefs),
+                  images: streamImages,
+                },
+              ]);
+            }
+            // mode === 'review' → chat-only, no chapter or preview mutation
           }
-          // mode === 'review' → chat-only, no chapter or preview mutation
-        }
 
-        if (mode === 'conjure') {
-          setStatusText('World conjured. Review the lore, then approve or request changes.');
-          addToast({ variant: 'success', message: 'World conjured successfully! Review and approve to begin.' });
-        } else if (mode === 'chapter') {
-          setStatusText('The Narrative Director awaits your next instruction.');
-          addToast({ variant: 'success', message: `Chapter generated successfully!` });
-        } else {
-          setStatusText('The Narrative Director awaits your next instruction.');
+          if (mode === 'conjure') {
+            setStatusText('World conjured. Review the lore, then approve or request changes.');
+            addToast({ variant: 'success', message: 'World conjured successfully! Review and approve to begin.' });
+          } else if (mode === 'chapter') {
+            setStatusText('The Narrative Director awaits your next instruction.');
+            addToast({ variant: 'success', message: `Chapter generated successfully!` });
+          } else {
+            setStatusText('The Narrative Director awaits your next instruction.');
+          }
+          break;
         }
       }
+    } catch (streamError) {
+      if (streamBuffer.trim()) {
+        updateChatMessageText(aiMessageId, streamBuffer.trim());
+        addToast({ variant: 'info', message: 'Connection interrupted. Partial response was preserved.' });
+      }
+      throw streamError;
+    }
+
+    if (!completed) {
+      if (streamBuffer.trim()) {
+        updateChatMessageText(aiMessageId, streamBuffer.trim());
+      }
+      throw new Error('Stream ended before completion. Please retry.');
     }
   };
 
@@ -798,8 +852,32 @@ export default function StoryStudio() {
   };
 
   const handleRandomSpark = () => {
-    const index = Date.now() % RANDOM_SPARKS.length;
-    updateForm('spark', RANDOM_SPARKS[index]);
+    if (exampleStories.length > 0) {
+      const seed = exampleStories[Math.floor(Math.random() * exampleStories.length)];
+      setForm((prev) => ({
+        ...prev,
+        genre: seed.genre,
+        customGenre: '',
+        worldEra: seed.world_era,
+        customWorldEra: '',
+        worldEssence: [...seed.world_essence],
+        customWorldEssence: '',
+        protagonistArchetype: seed.protagonist_archetype,
+        customProtagonistArchetype: '',
+        protagonistVirtues: [...seed.protagonist_virtues],
+        customProtagonistVirtues: '',
+        protagonistShadow: seed.protagonist_shadow,
+        customProtagonistShadow: '',
+        spark: seed.spark,
+        chapterLength: seed.chapter_length,
+        writingStyle: seed.writing_style,
+      }));
+      addToast({ variant: 'info', message: `Loaded example seed: ${seed.title}` });
+      return;
+    }
+
+    const index = Math.floor(Math.random() * DEFAULT_SPARKS.length);
+    updateForm('spark', DEFAULT_SPARKS[index]);
   };
 
   const renderConjureStep = () => {

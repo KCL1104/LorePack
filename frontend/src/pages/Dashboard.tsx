@@ -5,7 +5,7 @@ import { animate, stagger } from 'animejs';
 import { AdditiveBlending, Color } from 'three';
 import type { Points, ShaderMaterial } from 'three';
 
-import { getImage, listPublicLorebooks, type PublicLorebook } from '../api';
+import { listPublicLorebooks, type PublicLorebook } from '../api';
 import { Card, SectionHeader, Tag } from '../components/ui';
 import { useAppStore } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
@@ -154,7 +154,6 @@ export default function Dashboard() {
   const fetchImages = useAppStore((state) => state.fetchImages);
 
   const [publicLorebooks, setPublicLorebooks] = useState<PublicLorebook[]>([]);
-  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -189,43 +188,6 @@ export default function Dashboard() {
       cancelled = true;
     };
   }, [fetchImages, fetchLorebooks, fetchSessions]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadSignedUrls = async () => {
-      if (recentVisions.length === 0) {
-        setImageUrls({});
-        return;
-      }
-
-      const urlEntries = await Promise.all(
-        recentVisions.map(async (asset) => {
-          try {
-            const detail = await getImage(asset.id);
-            return [asset.id, detail.signed_url || detail.gs_uri] as const;
-          } catch {
-            return [asset.id, asset.gs_uri] as const;
-          }
-        }),
-      );
-
-      if (cancelled) return;
-
-      const nextMap: Record<string, string> = {};
-      for (const [id, url] of urlEntries) {
-        if (url && url.startsWith('http')) {
-          nextMap[id] = url;
-        }
-      }
-      setImageUrls(nextMap);
-    };
-
-    void loadSignedUrls();
-    return () => {
-      cancelled = true;
-    };
-  }, [recentVisions]);
 
   useEffect(() => {
     if (loading) return;
@@ -361,10 +323,10 @@ export default function Dashboard() {
             {heroVision ? (
               <div className={styles.visionLayout}>
                 <Card className={styles.heroVisionCard} data-dashboard-card>
-                  {resolveImageUrl(imageUrls[heroVision.id], heroVision.gs_uri) ? (
+                  {resolveImageUrl(heroVision.signed_url, heroVision.gs_uri) ? (
                     <img
                       className={styles.heroVisionImage}
-                      src={resolveImageUrl(imageUrls[heroVision.id], heroVision.gs_uri) || ''}
+                      src={resolveImageUrl(heroVision.signed_url, heroVision.gs_uri) || ''}
                       alt={getVisionTitle(heroVision.character_name, heroVision.scene_name)}
                       loading="lazy"
                     />
@@ -386,7 +348,7 @@ export default function Dashboard() {
                     </Card>
                   ) : (
                     thumbVisions.map((vision) => {
-                      const src = resolveImageUrl(imageUrls[vision.id], vision.gs_uri);
+                      const src = resolveImageUrl(vision.signed_url, vision.gs_uri);
                       return (
                         <Card key={vision.id} className={styles.thumbCard} data-dashboard-card>
                           {src ? (

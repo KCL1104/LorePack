@@ -32,7 +32,7 @@ interface AppState {
 
   // Gallery
   images: ImageAsset[];
-  fetchImages: (filters?: { asset_type?: string }) => Promise<void>;
+  fetchImages: (filters?: { asset_type?: string; lorebook_id?: string }) => Promise<void>;
 
   // A2A agents
   a2aAgents: A2AAgent[];
@@ -83,7 +83,7 @@ export const useAppStore = create<AppState>((set) => ({
   images: [],
 
   fetchImages: async (filters) => {
-    const images = await listImages(filters);
+    const images = await listImages({ ...filters, include_signed_url: true });
     set({ images });
   },
 

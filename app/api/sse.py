@@ -9,9 +9,9 @@ from collections.abc import AsyncGenerator
 
 from google.adk.artifacts import InMemoryArtifactService
 from google.adk.runners import Runner
-from google.adk.sessions import InMemorySessionService
 from google.genai import types as genai_types
 
+from app.app_utils.session_service import get_session_service
 from app.tools.user_context import scoped_user
 
 _logger = logging.getLogger("lorepack.sse")
@@ -23,7 +23,7 @@ def sse_event(event_type: str, data: dict) -> str:
     return f"data: {payload}\n\n"
 
 
-_session_service = InMemorySessionService()
+_session_service = get_session_service(logger=_logger)
 _artifact_service = InMemoryArtifactService()
 _runner: Runner | None = None
 
@@ -256,6 +256,9 @@ async def stream_agent_response(
                                 pass
         except Exception as exc:
             _logger.exception("Agent stream error session=%s: %s", session_id, exc)
-            yield sse_event("error", {"message": f"Agent error: {exc}"})
+            yield sse_event(
+                "error",
+                {"message": f"Agent error: {exc}", "retryable": True},
+            )
 
     yield sse_event("done", {"full_text": full_text})

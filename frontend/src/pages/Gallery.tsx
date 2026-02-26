@@ -3,9 +3,7 @@ import { Link } from 'react-router';
 
 import {
   generateImage,
-  getImage,
   type ImageAsset,
-  type ImageDetail,
 } from '../api';
 import { Button, Card, SectionHeader, Tag } from '../components/ui';
 import { useAppStore } from '../stores/appStore';
@@ -49,8 +47,8 @@ function formatAssetType(value: ImageAsset['asset_type']): string {
   return value === 'character' ? 'Character' : 'Scene';
 }
 
-function resolveImageUrl(detail: ImageDetail | null | undefined, fallback: string): string | null {
-  const candidate = detail?.signed_url || fallback;
+function resolveImageUrl(signedUrl: string | null | undefined, fallback: string): string | null {
+  const candidate = signedUrl || fallback;
   if (!candidate) return null;
   return candidate.startsWith('http') ? candidate : null;
 }
@@ -63,12 +61,10 @@ export default function Gallery() {
 
   const [assetFilter, setAssetFilter] = useState<AssetFilter>('all');
   const [selectedLorebookId, setSelectedLorebookId] = useState<string>('all');
-  const [imageDetails, setImageDetails] = useState<Record<string, ImageDetail | null>>({});
   const [pinnedHeroId, setPinnedHeroId] = useState<string | null>(null);
   const [lightboxImageId, setLightboxImageId] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
-  const [loadingDetails, setLoadingDetails] = useState(false);
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -97,44 +93,6 @@ export default function Gallery() {
   }, [fetchImages, fetchLorebooks]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    const loadImageDetails = async () => {
-      if (images.length === 0) {
-        setImageDetails({});
-        setLoadingDetails(false);
-        return;
-      }
-
-      setLoadingDetails(true);
-      const detailEntries = await Promise.all(
-        images.map(async (asset) => {
-          try {
-            const detail = await getImage(asset.id);
-            return [asset.id, detail] as const;
-          } catch {
-            return [asset.id, null] as const;
-          }
-        }),
-      );
-
-      if (cancelled) return;
-
-      const nextDetails: Record<string, ImageDetail | null> = {};
-      for (const [id, detail] of detailEntries) {
-        nextDetails[id] = detail;
-      }
-      setImageDetails(nextDetails);
-      setLoadingDetails(false);
-    };
-
-    void loadImageDetails();
-    return () => {
-      cancelled = true;
-    };
-  }, [images]);
-
-  useEffect(() => {
     if (!actionMessage) return;
     const timer = window.setTimeout(() => setActionMessage(null), 3600);
     return () => {
@@ -147,11 +105,10 @@ export default function Gallery() {
       if (assetFilter !== 'all' && asset.asset_type !== assetFilter) return false;
 
       if (selectedLorebookId === 'all') return true;
-      const detail = imageDetails[asset.id];
-      const lorebookId = detail?.lorebook_id || asset.lorebook_id || '';
+      const lorebookId = asset.lorebook_id || '';
       return lorebookId === selectedLorebookId;
     });
-  }, [assetFilter, imageDetails, images, selectedLorebookId]);
+  }, [assetFilter, images, selectedLorebookId]);
 
   const heroImage = useMemo(() => {
     if (filteredImages.length === 0) return null;
@@ -173,9 +130,8 @@ export default function Gallery() {
   }, [filteredImages, lightboxImageId]);
 
   const lightboxAsset = lightboxIndex >= 0 ? filteredImages[lightboxIndex] : null;
-  const lightboxDetail = lightboxAsset ? imageDetails[lightboxAsset.id] : null;
   const lightboxUrl = lightboxAsset
-    ? resolveImageUrl(lightboxDetail, lightboxAsset.gs_uri)
+    ? resolveImageUrl(lightboxAsset.signed_url, lightboxAsset.gs_uri)
     : null;
 
   useEffect(() => {
@@ -218,8 +174,7 @@ export default function Gallery() {
   const handleRegenerate = async () => {
     if (!lightboxAsset || regeneratingId) return;
 
-    const detail = imageDetails[lightboxAsset.id];
-    const lorebookId = detail?.lorebook_id || lightboxAsset.lorebook_id;
+    const lorebookId = lightboxAsset.lorebook_id;
     if (!lorebookId) {
       setError('Cannot regenerate this vision because lorebook metadata is missing.');
       return;
@@ -259,8 +214,7 @@ export default function Gallery() {
   };
 
   const selectedTabIndex = FILTER_TABS.findIndex((tab) => tab.value === assetFilter);
-  const heroDetail = heroImage ? imageDetails[heroImage.id] : null;
-  const heroUrl = heroImage ? resolveImageUrl(heroDetail, heroImage.gs_uri) : null;
+  const heroUrl = heroImage ? resolveImageUrl(heroImage.signed_url, heroImage.gs_uri) : null;
 
   return (
     <div className={styles.page}>
@@ -387,7 +341,7 @@ export default function Gallery() {
                   <div className={styles.heroOverlay}>
                     <div className={styles.heroTags}>
                       <Tag label={formatAssetType(heroImage.asset_type)} selected />
-                      {heroDetail?.lorebook_id ? <Tag label={`Lorebook ${heroDetail.lorebook_id}`} /> : null}
+                      {heroImage.lorebook_id ? <Tag label={`Lorebook ${heroImage.lorebook_id}`} /> : null}
                     </div>
                     <h2 className={styles.heroTitle}>{getVisionTitle(heroImage)}</h2>
                     <p className={styles.heroPrompt}>{summarizePrompt(heroImage.prompt_used)}</p>
@@ -414,7 +368,6 @@ export default function Gallery() {
                     <span className={styles.metaLabel}>Prompt</span>
                     <span className={styles.metaValue}>{summarizePrompt(heroImage.prompt_used)}</span>
                   </p>
-                  {loadingDetails ? <p className={styles.mutedText}>Resolving signed URLs...</p> : null}
                 </Card>
               </div>
             </section>
@@ -432,8 +385,7 @@ export default function Gallery() {
             ) : (
               <div className={styles.grid}>
                 {gridImages.map((asset) => {
-                  const detail = imageDetails[asset.id];
-                  const src = resolveImageUrl(detail, asset.gs_uri);
+                  const src = resolveImageUrl(asset.signed_url, asset.gs_uri);
                   return (
                     <button
                       key={asset.id}
@@ -520,7 +472,7 @@ export default function Gallery() {
                 </p>
                 <p>
                   <span className={styles.panelLabel}>Pose</span>
-                  <span className={styles.panelValue}>{lightboxDetail?.pose || 'Not specified'}</span>
+                  <span className={styles.panelValue}>{lightboxAsset.pose || 'Not specified'}</span>
                 </p>
                 <p>
                   <span className={styles.panelLabel}>Generated</span>
@@ -529,7 +481,7 @@ export default function Gallery() {
                 <p>
                   <span className={styles.panelLabel}>Lorebook</span>
                   <span className={styles.panelValue}>
-                    {lightboxDetail?.lorebook_id || lightboxAsset.lorebook_id || 'Unknown'}
+                    {lightboxAsset.lorebook_id || 'Unknown'}
                   </span>
                 </p>
               </div>
@@ -541,7 +493,7 @@ export default function Gallery() {
                   onClick={handleRegenerate}
                   disabled={
                     regeneratingId === lightboxAsset.id
-                    || !(lightboxDetail?.lorebook_id || lightboxAsset.lorebook_id)
+                    || !lightboxAsset.lorebook_id
                   }
                 >
                   {regeneratingId === lightboxAsset.id ? 'Regenerating...' : 'Regenerate'}

@@ -176,6 +176,8 @@ const zhTWTranslations: Record<string, string> = {
     'World preview — awaiting approval': '世界預覽—等待核准',
     'No chapters yet': '尚無章節',
     'No lorebook updates yet.': '尚無手冊更新。',
+    'Explore your Lorebook': '探索你的設定集',
+    'View your Gallery': '查看你的畫廊',
     'Lorebook Editor': '手冊編輯器',
     'Collaboration Hub': '協作中心',
     'Opening archive records...': '正在開啟典藏紀錄...',

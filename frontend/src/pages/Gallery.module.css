@@ -15,7 +15,7 @@
 .kicker {
   color: var(--gold-dim);
   font-family: var(--font-heading);
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
@@ -56,7 +56,7 @@
   font-family: var(--font-heading);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  font-size: 0.75rem;
+  font-size: 0.82rem;
   padding: 0.45rem 1rem 0.65rem;
   cursor: pointer;
   transition: color var(--transition-fast);
@@ -92,7 +92,7 @@
   font-family: var(--font-heading);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  font-size: 0.7rem;
+  font-size: 0.78rem;
 }
 
 .lorebookSelect {
@@ -185,14 +185,14 @@
 .guideStepTitle {
   font-family: var(--font-heading);
   color: var(--gold-dim);
-  font-size: 0.88rem;
+  font-size: 0.94rem;
   letter-spacing: 0.08em;
 }
 
 .guideStepDesc {
   color: var(--ink);
   font-family: var(--font-ui);
-  font-size: 0.86rem;
+  font-size: 0.92rem;
   line-height: 1.5;
   flex: 1;
 }
@@ -200,7 +200,7 @@
 .guideLink {
   color: var(--gold);
   font-family: var(--font-ui);
-  font-size: 0.82rem;
+  font-size: 0.88rem;
   text-decoration: none;
   letter-spacing: 0.06em;
   margin-top: var(--space-xs);
@@ -220,7 +220,7 @@
 .mutedText {
   color: var(--ink-muted);
   font-family: var(--font-ui);
-  font-size: 0.88rem;
+  font-size: 0.94rem;
   line-height: 1.45;
 }
 
@@ -235,7 +235,7 @@
   color: var(--gold-dim);
   text-decoration: none;
   font-family: var(--font-ui);
-  font-size: 0.82rem;
+  font-size: 0.88rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   transition: color var(--transition-fast);
@@ -331,14 +331,14 @@
   font-family: var(--font-heading);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  font-size: 0.7rem;
+  font-size: 0.78rem;
 }
 
 .metaValue {
   color: var(--ink);
   font-family: var(--font-ui);
   line-height: 1.4;
-  font-size: 0.86rem;
+  font-size: 0.92rem;
 }
 
 .grid {
@@ -407,7 +407,7 @@
 .gridMeta {
   color: var(--ink-muted);
   font-family: var(--font-ui);
-  font-size: 0.78rem;
+  font-size: 0.85rem;
 }
 
 .lightboxBackdrop {
@@ -458,10 +458,11 @@
 }
 
 .rightArrow {
-  right: calc(300px + var(--space-sm));
+  right: var(--space-sm);
 }
 
 .lightboxImagePane {
+  position: relative;
   min-height: 540px;
   background: var(--bg-void);
   display: flex;
@@ -511,14 +512,14 @@
   color: var(--gold-dim);
   font-family: var(--font-heading);
   letter-spacing: 0.1em;
-  font-size: 0.68rem;
+  font-size: 0.78rem;
   text-transform: uppercase;
 }
 
 .panelValue {
   color: var(--ink);
   font-family: var(--font-ui);
-  font-size: 0.85rem;
+  font-size: 0.92rem;
   line-height: 1.35;
 }
 
@@ -568,9 +569,6 @@
     max-height: 40vh;
   }
 
-  .rightArrow {
-    right: var(--space-sm);
-  }
 }
 
 @media (max-width: 860px) {

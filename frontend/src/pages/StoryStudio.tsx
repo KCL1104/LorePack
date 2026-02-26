@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { animate, stagger } from 'animejs';
 import type { ShaderMaterial } from 'three';
@@ -1673,6 +1673,13 @@ export default function StoryStudio() {
                 ))
               )}
             </div>
+
+            {worldApproved && chapters.length > 0 ? (
+              <div className={styles.pageLinks}>
+                <Link to="/lorebook" className={styles.pageLink}>✦ {t('Explore your Lorebook')}</Link>
+                <Link to="/gallery" className={styles.pageLink}>◈ {t('View your Gallery')}</Link>
+              </div>
+            ) : null}
           </Card>
         </section>
       )}

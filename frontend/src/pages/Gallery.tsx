@@ -48,10 +48,12 @@ function formatAssetType(value: ImageAsset['asset_type']): string {
   return value === 'character' ? 'Character' : 'Scene';
 }
 
-function resolveImageUrl(signedUrl: string | null | undefined, fallback: string): string | null {
-  const candidate = signedUrl || fallback;
-  if (!candidate) return null;
-  return candidate.startsWith('http') ? candidate : null;
+function resolveImageUrl(signedUrl: string | null | undefined, gsUri: string): string | null {
+  if (signedUrl && signedUrl.startsWith('http')) return signedUrl;
+  if (!gsUri) return null;
+  const match = gsUri.match(/^gs:\/\/([^/]+)\/(.+)$/);
+  if (match) return `https://storage.googleapis.com/${match[1]}/${match[2]}`;
+  return null;
 }
 
 export default function Gallery() {
@@ -439,17 +441,17 @@ export default function Gallery() {
             aria-label={t('Vision details')}
             onClick={(event) => event.stopPropagation()}
           >
-            <button
-              type="button"
-              className={`${styles.navArrow} ${styles.leftArrow}`}
-              onClick={() => shiftLightbox(-1)}
-              disabled={filteredImages.length <= 1}
-              aria-label={t('Previous vision')}
-            >
-              ‹
-            </button>
-
             <div className={styles.lightboxImagePane}>
+              <button
+                type="button"
+                className={`${styles.navArrow} ${styles.leftArrow}`}
+                onClick={() => shiftLightbox(-1)}
+                disabled={filteredImages.length <= 1}
+                aria-label={t('Previous vision')}
+              >
+                ‹
+              </button>
+
               {lightboxUrl ? (
                 <img
                   src={lightboxUrl}
@@ -459,6 +461,16 @@ export default function Gallery() {
               ) : (
                 <div className={styles.lightboxFallback}>{t('No accessible image URL')}</div>
               )}
+
+              <button
+                type="button"
+                className={`${styles.navArrow} ${styles.rightArrow}`}
+                onClick={() => shiftLightbox(1)}
+                disabled={filteredImages.length <= 1}
+                aria-label={t('Next vision')}
+              >
+                ›
+              </button>
             </div>
 
             <aside className={styles.lightboxPanel}>
@@ -521,16 +533,6 @@ export default function Gallery() {
                 </Button>
               </div>
             </aside>
-
-            <button
-              type="button"
-              className={`${styles.navArrow} ${styles.rightArrow}`}
-              onClick={() => shiftLightbox(1)}
-              disabled={filteredImages.length <= 1}
-              aria-label={t('Next vision')}
-            >
-              ›
-            </button>
           </div>
         </div>
       ) : null}

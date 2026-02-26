@@ -183,5 +183,5 @@ jobs:
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
 
       - name: Deploy to Firebase Hosting (production)
-        run: npx --yes firebase-tools deploy --only hosting --project ${{ vars.FIREBASE_PROJECT_ID }}
+        run: npx --yes firebase-tools deploy --only hosting --project ${{ vars.FIREBASE_PROJECT_ID || vars.CICD_PROJECT_ID }}
         working-directory: frontend

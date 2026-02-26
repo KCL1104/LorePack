@@ -55,7 +55,10 @@ function getVisionTitle(characterName: string, sceneName: string, fallbackLabel:
 function resolveImageUrl(primary: string | null | undefined, fallback: string): string | null {
   const candidate = primary || fallback;
   if (!candidate) return null;
-  return candidate.startsWith('http') ? candidate : null;
+  if (candidate.startsWith('http')) return candidate;
+  const match = candidate.match(/^gs:\/\/([^/]+)\/(.+)$/);
+  if (match) return `https://storage.googleapis.com/${match[1]}/${match[2]}`;
+  return null;
 }
 
 function ParticleConstellation() {
@@ -268,7 +271,7 @@ export default function Dashboard() {
                         <Tag label={formatLabel(session.genre, t('Unknown'))} selected />
                         <Tag label={formatLabel(session.status, t('Unknown'))} />
                       </div>
-                      <h3 className={styles.cardTitle}>{formatLabel(session.genre, t('Unknown'))} · {formatLabel(session.world_era, t('Unknown'))}</h3>
+                      <h3 className={styles.cardTitle}>{session.title || t('Unknown')}</h3>
                       <p className={styles.mutedText}>Lorebook {session.lorebook_id}</p>
                       <p className={styles.metaText}>{t('Last edited {time}', { time: formatDate(session.updated_at, dateLocale, t('Unknown')) })}</p>
                       <div className={styles.progressTrack}>

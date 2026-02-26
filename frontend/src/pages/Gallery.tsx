@@ -10,12 +10,13 @@ import { useI18n } from '../i18n';
 import { useAppStore } from '../stores/appStore';
 import styles from './Gallery.module.css';
 
-type AssetFilter = 'all' | 'character' | 'scene';
+type AssetFilter = 'all' | 'character' | 'scene' | 'other';
 
 const FILTER_TABS: { value: AssetFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'character', label: 'Characters' },
   { value: 'scene', label: 'Scenes' },
+  { value: 'other', label: 'Others' },
 ];
 
 function getVisionTitle(asset: ImageAsset): string {
@@ -45,7 +46,13 @@ function formatDate(value: string, dateLocale: string, unknownLabel: string): st
 }
 
 function formatAssetType(value: ImageAsset['asset_type']): string {
-  return value === 'character' ? 'Character' : 'Scene';
+  if (value === 'character') return 'Character';
+  if (value === 'scene') return 'Scene';
+  return 'Other';
+}
+
+function isRegenerableAssetType(value: string): value is 'character' | 'scene' {
+  return value === 'character' || value === 'scene';
 }
 
 function resolveImageUrl(signedUrl: string | null | undefined, gsUri: string): string | null {
@@ -106,7 +113,11 @@ export default function Gallery() {
 
   const filteredImages = useMemo(() => {
     return images.filter((asset) => {
-      if (assetFilter !== 'all' && asset.asset_type !== assetFilter) return false;
+      if (assetFilter === 'character' || assetFilter === 'scene') {
+        if (asset.asset_type !== assetFilter) return false;
+      } else if (assetFilter === 'other') {
+        if (asset.asset_type === 'character' || asset.asset_type === 'scene') return false;
+      }
 
       if (selectedLorebookId === 'all') return true;
       const lorebookId = asset.lorebook_id || '';
@@ -181,6 +192,10 @@ export default function Gallery() {
     const lorebookId = lightboxAsset.lorebook_id;
     if (!lorebookId) {
       setError(t('Cannot regenerate this vision because lorebook metadata is missing.'));
+      return;
+    }
+    if (!isRegenerableAssetType(lightboxAsset.asset_type)) {
+      setError(t('Cannot regenerate this vision because this image type is not supported yet.'));
       return;
     }
 
@@ -508,6 +523,7 @@ export default function Gallery() {
                   disabled={
                     regeneratingId === lightboxAsset.id
                     || !lightboxAsset.lorebook_id
+                    || !isRegenerableAssetType(lightboxAsset.asset_type)
                   }
                 >
                   {regeneratingId === lightboxAsset.id ? t('Regenerating...') : t('Regenerate')}

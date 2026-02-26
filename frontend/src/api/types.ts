@@ -44,7 +44,7 @@ export interface EntryUpdate {
 
 export interface ImageAsset {
   id: string;
-  asset_type: 'character' | 'scene';
+  asset_type: string;
   lorebook_id?: string;
   character_name: string;
   scene_name: string;

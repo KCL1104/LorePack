@@ -17,10 +17,10 @@ from app.tools.user_context import scoped_user
 _logger = logging.getLogger("lorepack.sse")
 
 
-def sse_event(event_type: str, data: dict) -> str:
-    """Format an SSE event string."""
+def sse_event(event_type: str, data: dict) -> dict[str, str]:
+    """Format an SSE event payload for EventSourceResponse."""
     payload = json.dumps({"type": event_type, **data}, ensure_ascii=False)
-    return f"data: {payload}\n\n"
+    return {"data": payload}
 
 
 _session_service = get_session_service(logger=_logger)
@@ -55,7 +55,7 @@ async def stream_agent_response(
     session_id: str,
     user_message: str,
     user_id: str = "frontend-user",
-) -> AsyncGenerator[str]:
+) -> AsyncGenerator[dict[str, str]]:
     """Run the agent and yield SSE events for the frontend.
 
     Yields events:
@@ -320,5 +320,6 @@ async def stream_agent_response(
                 "error",
                 {"message": f"Agent error: {exc}", "retryable": True},
             )
+            return
 
     yield sse_event("done", {"full_text": full_text})

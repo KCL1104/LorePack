@@ -444,9 +444,14 @@ export default function StoryStudio() {
         );
       }
 
-      setWorldApproved(true);
+      const isApproved = detail.status === 'active' || detail.status === 'completed';
+      setWorldApproved(isApproved);
       setPhase('desk');
-      setStatusText('Session resumed. The Narrative Director awaits your next instruction.');
+      setStatusText(
+        isApproved
+          ? 'Session resumed. The Narrative Director awaits your next instruction.'
+          : 'Session resumed. Review the conjured world, then approve to begin.',
+      );
       addToast({ variant: 'success', message: `Resumed: ${formatLabel(detail.genre)} · ${formatLabel(detail.world_era)}` });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load session.';
@@ -541,8 +546,20 @@ export default function StoryStudio() {
       ease: 'outQuad',
     });
 
+    // Fallback: ensure elements are visible even if the animation is interrupted
+    const fallback = setTimeout(() => {
+      targets.forEach((el) => {
+        (el as HTMLElement).style.opacity = '1';
+      });
+    }, 800);
+
     return () => {
       animation.pause();
+      clearTimeout(fallback);
+      // Ensure desk elements are visible on cleanup
+      targets.forEach((el) => {
+        (el as HTMLElement).style.opacity = '1';
+      });
     };
   }, [phase]);
 
@@ -864,7 +881,6 @@ export default function StoryStudio() {
       setWorldPreview(null);
     }
 
-    setWorldApproved(true);
     setError(null);
     setIsGenerating(true);
     setStatusText('The Narrative Director begins your tale...');
@@ -876,13 +892,14 @@ export default function StoryStudio() {
 
     try {
       await consumeStoryStream(sendMessage(sessionId, beginText), aiMessageId, 'chapter');
+      setWorldApproved(true);
       await fetchSession(sessionId);
       await fetchSessions();
     } catch (streamError) {
       const message = streamError instanceof Error ? streamError.message : 'Failed to begin chapter.';
       setError(message);
       appendChatMessage({ id: createId('sys'), role: 'system', text: `Error: ${message}` });
-      setStatusText('Chapter generation interrupted.');
+      setStatusText('Chapter generation interrupted. You may retry approval.');
     } finally {
       setIsGenerating(false);
     }
@@ -1674,7 +1691,7 @@ export default function StoryStudio() {
               )}
             </div>
 
-            {worldApproved && chapters.length > 0 ? (
+            {lorebookId ? (
               <div className={styles.pageLinks}>
                 <Link to="/lorebook" className={styles.pageLink}>✦ {t('Explore your Lorebook')}</Link>
                 <Link to="/gallery" className={styles.pageLink}>◈ {t('View your Gallery')}</Link>

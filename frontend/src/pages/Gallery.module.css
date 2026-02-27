@@ -45,7 +45,7 @@
 .tabs {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  grid-template-columns: repeat(4, minmax(90px, 1fr));
   border-bottom: 1px solid rgba(139, 115, 85, 0.6);
 }
 
@@ -74,7 +74,7 @@
   position: absolute;
   left: 0;
   bottom: -1px;
-  width: calc(100% / 3);
+  width: calc(100% / 4);
   height: 2px;
   background: var(--gold);
   transition: transform var(--transition-base);
@@ -578,7 +578,7 @@
 
   .tabs {
     width: 100%;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .lorebookFilter {

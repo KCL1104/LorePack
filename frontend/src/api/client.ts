@@ -228,7 +228,8 @@ export async function* streamSSE(
 
   const parseSSEBlock = (block: string): SSEEvent[] => {
     const dataLines = block
-      .split('\n')
+      .split(/\r?\n/)
+      .map((line) => line.replace(/\r$/, ''))
       .filter((line) => line.startsWith('data:'))
       .map((line) => line.replace(/^data:\s?/, ''));
 
@@ -298,7 +299,7 @@ export async function* streamSSE(
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
-      const blocks = buffer.split('\n\n');
+      const blocks = buffer.split(/\r?\n\r?\n/);
       buffer = blocks.pop() || '';
       for (const block of blocks) {
         const events = parseSSEBlock(block);

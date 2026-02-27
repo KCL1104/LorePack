@@ -342,8 +342,25 @@ async def get_session(
                 }
             )
 
-    session["chapters"] = chapters
-    return session
+    return {
+        "id": session.get("id") or session_id,
+        "title": session.get("title", ""),
+        "genre": session.get("genre", ""),
+        "world_era": session.get("world_era", ""),
+        "world_essence": session.get("world_essence", []),
+        "protagonists": session.get("protagonists", []),
+        "protagonist_archetype": session.get("protagonist_archetype", ""),
+        "protagonist_virtues": session.get("protagonist_virtues", []),
+        "protagonist_shadow": session.get("protagonist_shadow", ""),
+        "spark": session.get("spark", ""),
+        "status": session.get("status", ""),
+        "lorebook_id": session.get("lorebook_id", ""),
+        "chapter_length": session.get("chapter_length", "medium"),
+        "writing_style": session.get("writing_style", "literary fiction"),
+        "created_at": _as_iso_string(session.get("created_at", "")),
+        "updated_at": _as_iso_string(session.get("updated_at", "")),
+        "chapters": chapters,
+    }
 
 
 @router.delete("/{session_id}")
@@ -357,18 +374,20 @@ async def delete_session(
 
     lorebook_id = session.get("lorebook_id", "")
 
-    # Delete chapters
+    # Delete associated lorebook data (only if owned by current user)
     if lorebook_id:
-        chapters_ref = (
-            db.collection("stories").document(lorebook_id).collection("chapters")
-        )
-        for ch in chapters_ref.stream():
-            ch.reference.delete()
-        db.collection("stories").document(lorebook_id).delete()
-
         lorebook_ref = db.collection("lorebooks").document(lorebook_id)
         lorebook_snap = lorebook_ref.get()
         if lorebook_snap.exists and lorebook_snap.to_dict().get("owner_uid") == current_user.uid:
+            # Delete chapters
+            chapters_ref = (
+                db.collection("stories").document(lorebook_id).collection("chapters")
+            )
+            for ch in chapters_ref.stream():
+                ch.reference.delete()
+            db.collection("stories").document(lorebook_id).delete()
+
+            # Delete lorebook entries and lorebook itself
             for entry in lorebook_ref.collection("entries").stream():
                 entry.reference.delete()
             lorebook_ref.delete()
@@ -416,7 +435,11 @@ async def suggest_titles(
         f"- Return ONLY the titles, one per line, no numbering or extra text"
     )
 
-    client = genai.Client(vertexai=True, project="gemini-hack-487911", location="global")
+    import os
+
+    project = os.getenv("GOOGLE_CLOUD_PROJECT", "gemini-hack-487911")
+    location = os.getenv("VERTEX_LOCATION", "global")
+    client = genai.Client(vertexai=True, project=project, location=location)
     response = client.models.generate_content(
         model="gemini-2.0-flash",
         contents=prompt,
